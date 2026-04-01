@@ -12,7 +12,7 @@ def test_orm_insert(db_session, capquery):
     capquery.statements.clear()
     db_session.flush()
     
-    capquery.assert_total_queries(3)
+    capquery.assert_total_queries(4)
     # Assert that an insert into alarm_panels occurred
     capquery.assert_has_executed_query(
         "INSERT INTO alarm_panels (mac_address, is_online) VALUES (?, ?)",

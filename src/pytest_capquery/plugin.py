@@ -2,6 +2,7 @@ import functools
 
 import pytest
 import sqlparse
+from sqlalchemy import event
 from sqlalchemy_capture_sql import CaptureSqlStatements
 
 format_query = functools.partial(sqlparse.format, reindent=True, keyword_case="upper")
@@ -21,7 +22,41 @@ def reformat_query(query: str) -> str:
     return format_query(query)
 
 
+class TxEvent:
+    def __init__(self, stmt):
+        self.statement = stmt
+        self.parameters = None
+        self.idx = id(self)
+        self.duration = 0.0
+        self.first_table = "N/A"
+        self.sql_type = "EVENT"
+    
+    def set_tst_next(self, now):
+        pass
+
+
 class CapQueryWrapper(CaptureSqlStatements):
+    def __enter__(self):
+        super().__enter__()
+        
+        self._listeners = {
+            'begin': lambda c: self.statements.append(TxEvent("BEGIN")),
+            'commit': lambda c: self.statements.append(TxEvent("COMMIT")),
+            'rollback': lambda c: self.statements.append(TxEvent("ROLLBACK")),
+            'savepoint': lambda c, name: self.statements.append(TxEvent(f"SAVEPOINT {name}")),
+            'rollback_savepoint': lambda c, name, ctx: self.statements.append(TxEvent(f"ROLLBACK TO SAVEPOINT {name}")),
+            'release_savepoint': lambda c, name, ctx: self.statements.append(TxEvent(f"RELEASE SAVEPOINT {name}")),
+        }
+        for name, fn in self._listeners.items():
+            event.listen(self.engine, name, fn)
+            
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for name, fn in self._listeners.items():
+            event.remove(self.engine, name, fn)
+        return super().__exit__(exc_type, exc_val, exc_tb)
+
     @property
     def queries_history(self) -> str:
         """
@@ -62,13 +97,21 @@ class CapQueryWrapper(CaptureSqlStatements):
     def assert_total_queries(self, expected_total_queries: int):
         assert len(self.statements) == expected_total_queries, self.help
 
+    def assert_has_begin(self):
+        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
+        assert any(stmt == "BEGIN" for stmt in executed_stmts), self.help
+
     def assert_has_commit(self):
         executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
-        assert any(stmt.startswith("RELEASE SAVEPOINT") or stmt == "COMMIT" for stmt in executed_stmts), self.help
+        assert any(stmt == "COMMIT" for stmt in executed_stmts), self.help
+
+    def assert_has_rollback(self):
+        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
+        assert any(stmt == "ROLLBACK" for stmt in executed_stmts), self.help
 
     def assert_has_no_commit(self):
         executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
-        assert not any(stmt.startswith("RELEASE SAVEPOINT") or stmt == "COMMIT" for stmt in executed_stmts), self.help
+        assert not any(stmt == "COMMIT" for stmt in executed_stmts), self.help
 
     def assert_has_executed_query(self, expected_query: str, expected_params=None):
         expected_formatted = reformat_query(expected_query)
