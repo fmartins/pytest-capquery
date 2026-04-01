@@ -4,10 +4,21 @@
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)
 
+Testing your business logic is good, but **testing your database interactions is critical**.
+`pytest-capquery` treats your SQL queries as first-class citizens in your test suite. By asserting
+the exact queries executed, you create living documentation of what is truly happening behind the
+scenes. This guarantees deterministic performance, catches N+1 regressions instantly, and ensures
+your application behaves exactly as intended.
+
 `pytest-capquery` is a strict, strongly-typed SQLAlchemy pytest plugin designed to enforce exact
-chronological query execution and catch N+1 regressions. By asserting precise SQL strings, parameter
-bindings, and transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`), `pytest-capquery` guarantees
-that your database interactions behave exactly as intended.
+chronological query execution. It asserts precise SQL strings, parameter bindings, and transaction
+boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`).
+
+## Used By
+
+`pytest-capquery` is actively used to protect the database performance of:
+
+- [macafe CLOUD](https://macafe.cloud/)
 
 ## Installation
 
@@ -47,11 +58,19 @@ def test_insert_alarm_panel(db_session: Session, capquery):
     capquery.assert_executed_queries(
         "BEGIN",
         (
-            "INSERT INTO alarm_panels (mac_address, is_online) VALUES (?, ?)",
+            # language=SQL
+            """
+            INSERT INTO alarm_panels (mac_address, is_online)
+            VALUES (?, ?)
+            """,
             ("00:11:22:33:44:55", 1)
         ),
         (
-            "INSERT INTO sensors (panel_id, name, sensor_type) VALUES (?, ?, ?) RETURNING id",
+            # language=SQL
+            """
+            INSERT INTO sensors (panel_id, name, sensor_type)
+            VALUES (?, ?, ?)
+            """,
             (1, "Front Door", "Contact")
         )
     )
@@ -82,37 +101,52 @@ def test_demonstrate_n_plus_one_problem(db_session: Session, capquery):
     # Asserting the resulting N+1 problem
     capquery.assert_executed_queries(
         # The 1 Query
-        "SELECT alarm_panels.id AS alarm_panels_id, "
-        "alarm_panels.mac_address AS alarm_panels_mac_address, "
-        "alarm_panels.is_online AS alarm_panels_is_online "
-        "FROM alarm_panels",
-
+        # language=SQL
+        """
+        SELECT
+            alarm_panels.id AS alarm_panels_id,
+            alarm_panels.mac_address AS alarm_panels_mac_address,
+            alarm_panels.is_online AS alarm_panels_is_online
+        FROM alarm_panels
+        """,
         # The +N Queries
         (
-            "SELECT sensors.id AS sensors_id, "
-            "sensors.panel_id AS sensors_panel_id, "
-            "sensors.name AS sensors_name, "
-            "sensors.sensor_type AS sensors_sensor_type "
-            "FROM sensors "
-            "WHERE ? = sensors.panel_id",
+            # language=SQL
+            """
+            SELECT
+                sensors.id AS sensors_id,
+                sensors.panel_id AS sensors_panel_id,
+                sensors.name AS sensors_name,
+                sensors.sensor_type AS sensors_sensor_type
+            FROM sensors
+            WHERE ? = sensors.panel_id
+            """,
             (1,)
         ),
         (
-            "SELECT sensors.id AS sensors_id, "
-            "sensors.panel_id AS sensors_panel_id, "
-            "sensors.name AS sensors_name, "
-            "sensors.sensor_type AS sensors_sensor_type "
-            "FROM sensors "
-            "WHERE ? = sensors.panel_id",
+            # language=SQL
+            """
+            SELECT
+                sensors.id AS sensors_id,
+                sensors.panel_id AS sensors_panel_id,
+                sensors.name AS sensors_name,
+                sensors.sensor_type AS sensors_sensor_type
+            FROM sensors
+            WHERE ? = sensors.panel_id
+            """,
             (2,)
         ),
         (
-            "SELECT sensors.id AS sensors_id, "
-            "sensors.panel_id AS sensors_panel_id, "
-            "sensors.name AS sensors_name, "
-            "sensors.sensor_type AS sensors_sensor_type "
-            "FROM sensors "
-            "WHERE ? = sensors.panel_id",
+            # language=SQL
+            """
+            SELECT
+                sensors.id AS sensors_id,
+                sensors.panel_id AS sensors_panel_id,
+                sensors.name AS sensors_name,
+                sensors.sensor_type AS sensors_sensor_type
+            FROM sensors
+            WHERE ? = sensors.panel_id
+            """,
             (3,)
         )
     )
@@ -138,19 +172,53 @@ def test_avoid_n_plus_one_queries(db_session: Session, capquery):
 
     # Asserting only a single JOIN query was executed
     capquery.assert_executed_queries(
-        "SELECT alarm_panels.id AS alarm_panels_id, "
-        "alarm_panels.mac_address AS alarm_panels_mac_address, "
-        "alarm_panels.is_online AS alarm_panels_is_online, "
-        "sensors_1.id AS sensors_1_id, "
-        "sensors_1.panel_id AS sensors_1_panel_id, "
-        "sensors_1.name AS sensors_1_name, "
-        "sensors_1.sensor_type AS sensors_1_sensor_type "
-        "FROM alarm_panels "
-        "LEFT OUTER JOIN sensors AS sensors_1 ON alarm_panels.id = sensors_1.panel_id"
+        # language=SQL
+        """
+        SELECT
+            alarm_panels.id AS alarm_panels_id,
+            alarm_panels.mac_address AS alarm_panels_mac_address,
+            alarm_panels.is_online AS alarm_panels_is_online,
+            sensors_1.id AS sensors_1_id,
+            sensors_1.panel_id AS sensors_1_panel_id,
+            sensors_1.name AS sensors_1_name,
+            sensors_1.sensor_type AS sensors_1_sensor_type
+        FROM alarm_panels
+        LEFT OUTER JOIN sensors AS sensors_1 ON alarm_panels.id = sensors_1.panel_id
+        """
     )
+```
+
+## Contributing
+
+We welcome contributions to make this plugin even better! To ensure a smooth process, please follow
+these steps:
+
+1. **Open an Issue:** Before writing any code, please open an issue to discuss the feature,
+   enhancement, or bug fix you have in mind.
+2. **Contribute the Code:** Once discussed, fork the repository, create your branch, make your
+   changes, and submit a Pull Request.
+3. **Review & Release:** Felipe will review your PR. Once approved and merged, the release process
+   will be managed by the maintainer.
+
+### Developer Setup
+
+To get your local environment ready for contribution, run the following commands:
+
+```bash
+# Clone the repository
+git clone [https://github.com/fmartins/pytest-capquery.git](https://github.com/fmartins/pytest-capquery.git)
+cd pytest-capquery
+
+# Install Python, dependencies, and pre-commit hooks
+make setup
+
+# Run the full test suite (requires Docker for E2E multi-dialect tests)
+make test
 ```
 
 ## License
 
 This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0
-International (CC BY-NC-SA 4.0)**. Author: fmartins
+International (CC BY-NC-SA 4.0)**.
+
+Author: [Felipe Cardoso Martins](https://github.com/fmartins)
