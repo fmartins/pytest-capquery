@@ -23,6 +23,9 @@ jobs:
       - name: Install dependencies and setup
         run: make setup
 
+      - name: Check code formatting
+        run: make check-format
+
       - name: Run unit tests
         run: make test-unit
 
