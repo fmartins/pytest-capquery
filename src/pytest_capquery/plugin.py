@@ -24,6 +24,20 @@ def reformat_query(query: str) -> str:
     return format_query(query)
 
 
+def _normalize_params(params: Any) -> Any:
+    """
+    Recursively normalizes parameter structures to ensure cross-dialect equality.
+    - Dicts: Sorted by key into a tuple of tuples.
+    - Lists/Tuples: Converted to tuples, recursive normalization applied to elements.
+    - Other types are left as-is.
+    """
+    if isinstance(params, dict):
+        return tuple(sorted((k, _normalize_params(v)) for k, v in params.items()))
+    elif isinstance(params, (list, tuple)):
+        return tuple(_normalize_params(v) for v in params)
+    return params
+
+
 class TxEvent:
     """Wrapper for transaction events to match SQL statement structure."""
     def __init__(self, stmt: str) -> None:
@@ -116,11 +130,14 @@ class CapQueryWrapper(CaptureSqlStatements):
                 )
             
             if expected_params is not None:
-                if expected_params != actual_params:
+                norm_expected = _normalize_params(expected_params)
+                norm_actual = _normalize_params(actual_params)
+                if norm_expected != norm_actual:
                     raise AssertionError(
                         f"Mismatch at index {i}\n"
                         f"Expected Params:\n{expected_params}\n\n"
                         f"Actual Params:\n{actual_params}\n\n"
+                        f"Normalized Context:\nExpected: {norm_expected}\nActual: {norm_actual}\n\n"
                         f"{self.help}"
                     )
             else:
