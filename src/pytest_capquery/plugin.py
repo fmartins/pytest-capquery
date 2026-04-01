@@ -139,12 +139,12 @@ class CapQueryWrapper(CaptureSqlStatements):
     """
     A context manager and SQLAlchemy event listener for capturing executed queries.
 
-    This class runs at the boundary of SQLAlchemy engines, intercepting query 
-    events in real time while pushing explicit transaction logs (BEGIN, COMMIT) 
+    This class runs at the boundary of SQLAlchemy engines, intercepting query
+    events in real time while pushing explicit transaction logs (BEGIN, COMMIT)
     into a unified collection timeline.
 
-    It exposes rigorous assertion methods to ensure an explicit chronological 
-    execution order, safeguarding ORMs against N+1 regression patterns and 
+    It exposes rigorous assertion methods to ensure an explicit chronological
+    execution order, safeguarding ORMs against N+1 regression patterns and
     excessive transaction footprints.
     """
     _listeners: Dict[str, Callable[[Connection], None]]
@@ -157,7 +157,7 @@ class CapQueryWrapper(CaptureSqlStatements):
             CapQueryWrapper: The active wrapper capturing queries.
         """
         super().__enter__()
-        
+
         self._listeners = {
             "begin": lambda conn: self.statements.append(TxEvent("BEGIN")),
             "commit": lambda conn: self.statements.append(TxEvent("COMMIT")),
@@ -165,7 +165,7 @@ class CapQueryWrapper(CaptureSqlStatements):
         }
         for name, fn in self._listeners.items():
             event.listen(self.engine, name, fn)
-            
+
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -195,9 +195,9 @@ class CapQueryWrapper(CaptureSqlStatements):
         """
         Generates a copy-and-paste friendly string of all captured statements.
 
-        This output translates internal session state into structured triple-quoted 
-        string assertions. When debugging test failures, developers can inject this 
-        property's output into their test code to rebuild their strict chronology 
+        This output translates internal session state into structured triple-quoted
+        string assertions. When debugging test failures, developers can inject this
+        property's output into their test code to rebuild their strict chronology
         expectations visually rather than doing it manually.
 
         Returns:
@@ -230,16 +230,16 @@ class CapQueryWrapper(CaptureSqlStatements):
         """
         Asserts that captured statements match an expected chronological sequence.
 
-        This guarantees the absolute order, formatting, and parameter bound types 
+        This guarantees the absolute order, formatting, and parameter bound types
         of every database command executed during the wrapped timeline.
 
         Users can define individual `expected_queries` items using two strict shapes:
         1. A raw `str` like `"BEGIN"` or an explicit pure query without parameters.
-        2. A `Tuple[str, Any]` to match a specific executable query against 
+        2. A `Tuple[str, Any]` to match a specific executable query against
            a precise boundary of parameters.
 
         Args:
-            *expected_queries (Union[str, Tuple[str, Any]]): Variable length positional 
+            *expected_queries (Union[str, Tuple[str, Any]]): Variable length positional
                 arguments specifying the exact chronological sequence of queries.
             strict (bool): When True, forcefully ensures that the total number of expected
                 queries equates to the total volume of queries captured inside the test run.
@@ -259,11 +259,11 @@ class CapQueryWrapper(CaptureSqlStatements):
                     f"Expected query or event but no more statements were recorded.\n\n"
                     f"{self.help}"
                 )
-                
+
             actual_stmt = self._normalize_statement(self.statements[i])
             actual_q_str = actual_stmt.statement
             actual_params = actual_stmt.parameters
-            
+
             if isinstance(expected, tuple):
                 expected_q_str, expected_params = expected
             else:
@@ -271,7 +271,7 @@ class CapQueryWrapper(CaptureSqlStatements):
 
             expected_formatted = reformat_query(expected_q_str)
             actual_formatted = reformat_query(actual_q_str)
-            
+
             if expected_formatted != actual_formatted:
                 raise AssertionError(
                     f"Mismatch at index {i}\n"
@@ -279,7 +279,7 @@ class CapQueryWrapper(CaptureSqlStatements):
                     f"Actual SQL:\n{actual_formatted}\n\n"
                     f"{self.help}"
                 )
-            
+
             if expected_params is not None:
                 norm_expected = _normalize_params(expected_params)
                 norm_actual = _normalize_params(actual_params)
@@ -321,7 +321,7 @@ def capquery(sqlite_engine: Engine) -> CapQueryWrapper:
     """
     A pytest fixture yielding an active CapQueryWrapper across `sqlite_engine`.
 
-    This simplifies asserting against database states within test cases by 
+    This simplifies asserting against database states within test cases by
     intercepting execution instantly upon integration.
 
     Args:

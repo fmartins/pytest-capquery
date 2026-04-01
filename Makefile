@@ -14,6 +14,7 @@ install: ## Create venv and install dependencies
 	python -m venv .venv
 	./.venv/bin/pip install -U pip
 	./.venv/bin/pip install -e '.[test]'
+	./.venv/bin/pre-commit install
 
 db-up: ## Start Docker Compose databases
 	docker compose up -d

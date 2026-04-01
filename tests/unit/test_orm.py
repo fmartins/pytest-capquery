@@ -7,12 +7,12 @@ def test_orm_insert(db_session, capquery):
     sensor1 = Sensor(name="Front Door", sensor_type="Contact")
     sensor2 = Sensor(name="Living Room", sensor_type="Motion")
     panel.sensors.extend([sensor1, sensor2])
-    
+
     db_session.add(panel)
-    
+
     capquery.statements.clear()
     db_session.flush()
-    
+
     capquery.assert_executed_queries(
         "BEGIN",
         (
@@ -64,7 +64,7 @@ def test_orm_delete(db_session, capquery):
     panel.sensors.append(sensor)
     db_session.add(panel)
     db_session.flush()
-    
+
     capquery.statements.clear()
 
     # Query and delete
@@ -99,7 +99,7 @@ def test_orm_select(db_session, capquery):
 
     # Query
     fetched_panel = db_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
-    
+
     assert fetched_panel is not None
     capquery.assert_executed_queries(
         (
@@ -122,11 +122,11 @@ def test_avoid_n_plus_one_queries(db_session, capquery):
         db_session.add(panel)
     db_session.flush()
     db_session.expunge_all()
-    
+
     capquery.statements.clear()
 
     panels = db_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).all()
-    
+
     for panel in panels:
         _ = panel.sensors
         for sensor in panel.sensors:
@@ -152,11 +152,11 @@ def test_demonstrate_n_plus_one_problem(db_session, capquery):
         db_session.add(panel)
     db_session.flush()
     db_session.expunge_all()
-    
+
     capquery.statements.clear()
 
     panels = db_session.query(AlarmPanel).all()
-    
+
     for panel in panels:
         _ = panel.sensors
         for sensor in panel.sensors:

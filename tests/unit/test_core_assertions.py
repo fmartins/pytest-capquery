@@ -69,7 +69,7 @@ def test_complex_nested_transactions(capquery, sqlite_engine):
             conn.execute(text("SELECT 1"))
             with conn.begin_nested():
                 conn.execute(text("SELECT 2"))
-            
+
             with conn.begin_nested() as nested:
                 conn.execute(text("SELECT 3"))
                 nested.rollback()
