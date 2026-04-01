@@ -4,7 +4,10 @@
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)
 
-`pytest-capquery` is a strict, strongly-typed SQLAlchemy pytest plugin designed to enforce exact chronological query execution and catch N+1 regressions. By asserting precise SQL strings, parameter bindings, and transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`), `pytest-capquery` guarantees that your database interactions behave exactly as intended.
+`pytest-capquery` is a strict, strongly-typed SQLAlchemy pytest plugin designed to enforce exact
+chronological query execution and catch N+1 regressions. By asserting precise SQL strings, parameter
+bindings, and transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`), `pytest-capquery` guarantees
+that your database interactions behave exactly as intended.
 
 ## Installation
 
@@ -16,9 +19,11 @@ pip install pytest-capquery
 
 ## Quick Start
 
-The `capquery` fixture captures all SQLAlchemy statements executed by your code. You can use it to assert precise SQL queries, exact bound parameters, and transaction events in deterministic order. 
+The `capquery` fixture captures all SQLAlchemy statements executed by your code. You can use it to
+assert precise SQL queries, exact bound parameters, and transaction events in deterministic order.
 
-Here is how you can use the `capquery` fixture alongside your SQLAlchemy models (e.g., `AlarmPanel` and `Sensor`):
+Here is how you can use the `capquery` fixture alongside your SQLAlchemy models (e.g., `AlarmPanel`
+and `Sensor`):
 
 ```python
 from sqlalchemy.orm import Session
@@ -29,15 +34,15 @@ def test_insert_alarm_panel(db_session: Session, capquery):
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor = Sensor(name="Front Door", sensor_type="Contact")
     panel.sensors.append(sensor)
-    
+
     db_session.add(panel)
-    
+
     # Clear any unrelated previous queries
     capquery.statements.clear()
-    
+
     # Trigger database flush
     db_session.flush()
-    
+
     # Assert exact chronological execution, parameters, and transaction boundaries
     capquery.assert_executed_queries(
         "BEGIN",
@@ -54,19 +59,22 @@ def test_insert_alarm_panel(db_session: Session, capquery):
 
 ## The N+1 Problem Showcase
 
-One of the most powerful use cases for `pytest-capquery` is catching performance regressions associated with the 1+N lazy-loading problem. It clearly contrasts inefficient DB loops with optimized joined-loading.
+One of the most powerful use cases for `pytest-capquery` is catching performance regressions
+associated with the 1+N lazy-loading problem. It clearly contrasts inefficient DB loops with
+optimized joined-loading.
 
 ### Catching a 1+N Lazy-Loading Regression
 
-If a developer drops the `joinedload` behavior, `pytest-capquery` will expose the exact 1+N lazy-loading queries:
+If a developer drops the `joinedload` behavior, `pytest-capquery` will expose the exact 1+N
+lazy-loading queries:
 
 ```python
 def test_demonstrate_n_plus_one_problem(db_session: Session, capquery):
     capquery.statements.clear()
 
-    # Query all panels WITHOUT eagerly loading sensors 
+    # Query all panels WITHOUT eagerly loading sensors
     panels = db_session.query(AlarmPanel).all()
-    
+
     # Accessing the lazy relationship triggers N+1 queries
     for panel in panels:
         _ = panel.sensors
@@ -78,8 +86,8 @@ def test_demonstrate_n_plus_one_problem(db_session: Session, capquery):
         "alarm_panels.mac_address AS alarm_panels_mac_address, "
         "alarm_panels.is_online AS alarm_panels_is_online "
         "FROM alarm_panels",
-        
-        # The +N Queries 
+
+        # The +N Queries
         (
             "SELECT sensors.id AS sensors_id, "
             "sensors.panel_id AS sensors_panel_id, "
@@ -112,7 +120,8 @@ def test_demonstrate_n_plus_one_problem(db_session: Session, capquery):
 
 ### Fixing the N+1 problem with joined-loading
 
-When developers optimize their query with `joinedload`, `pytest-capquery` verifies the problem is fixed:
+When developers optimize their query with `joinedload`, `pytest-capquery` verifies the problem is
+fixed:
 
 ```python
 from sqlalchemy.orm import joinedload
@@ -122,7 +131,7 @@ def test_avoid_n_plus_one_queries(db_session: Session, capquery):
 
     # Query WITH eager loading
     panels = db_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).all()
-    
+
     # Accessing the relationship no longer triggers additional queries
     for panel in panels:
         _ = panel.sensors
@@ -143,5 +152,5 @@ def test_avoid_n_plus_one_queries(db_session: Session, capquery):
 
 ## License
 
-This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
-Author: fmartins
+This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+International (CC BY-NC-SA 4.0)**. Author: fmartins

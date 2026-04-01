@@ -8,9 +8,9 @@ services:
       POSTGRES_DB: capquery_test
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - '5432:5432'
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d capquery_test"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d capquery_test']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,9 +22,9 @@ services:
       MYSQL_DATABASE: capquery_test
       MYSQL_ROOT_PASSWORD: root
     ports:
-      - "3306:3306"
+      - '3306:3306'
     healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
       interval: 5s
       timeout: 5s
       retries: 5
