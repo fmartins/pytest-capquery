@@ -8,7 +8,7 @@ setup:
 	./.venv/bin/pip install -e '.[test]'
 
 test:
-	./.venv/bin/pytest tests/
+	./.venv/bin/pytest -vvv tests/
 
 clean:
 	rm -rf .venv
