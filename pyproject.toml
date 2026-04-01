@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-capquery"
+version = "0.1.0"
+description = "A pytest fixture for high-precision SQL testing in SQLAlchemy."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pytest",
+    "sqlalchemy",
+    "sqlparse",
+    "sqlalchemy-capture-sql"
+]
+
+[project.entry-points.pytest11]
+capquery = "pytest_capquery.plugin"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "sqlalchemy-capture-sql",
+    "sqlparse",
+    "psycopg2-binary",
+    "pymysql",
+    "cryptography",
+    "pre-commit"
+]
