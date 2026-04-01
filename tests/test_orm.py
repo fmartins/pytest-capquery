@@ -31,13 +31,16 @@ def test_orm_insert(db_session, capquery):
     capquery.statements.clear()
     db_session.flush()
     
+    capquery.assert_total_queries(3)
     # Assert that an insert into alarm_panels occurred
     capquery.assert_has_executed_query(
-        "INSERT INTO alarm_panels (mac_address, is_online) VALUES (?, ?)"
+        "INSERT INTO alarm_panels (mac_address, is_online) VALUES (?, ?)",
+        expected_params=("00:11:22:33:44:55", 1)
     )
     # Assert that an insert into sensors occurred
     capquery.assert_has_executed_query(
-        "INSERT INTO sensors (panel_id, name, sensor_type) VALUES (?, ?, ?) RETURNING id"
+        "INSERT INTO sensors (panel_id, name, sensor_type) VALUES (?, ?, ?) RETURNING id",
+        expected_params=(1, "Front Door", "Contact")
     )
 
 def test_orm_update(db_session, capquery):
@@ -53,8 +56,10 @@ def test_orm_update(db_session, capquery):
     panel.is_online = True
     db_session.flush()
 
+    capquery.assert_total_queries(2)
     capquery.assert_has_executed_query(
-        "UPDATE alarm_panels SET is_online=? WHERE alarm_panels.id = ?"
+        "UPDATE alarm_panels SET is_online=? WHERE alarm_panels.id = ?",
+        expected_params=(1, 1)
     )
 
 def test_orm_delete(db_session, capquery):
@@ -72,8 +77,10 @@ def test_orm_delete(db_session, capquery):
     db_session.delete(sensor_to_delete)
     db_session.flush()
 
+    capquery.assert_total_queries(2)
     capquery.assert_has_executed_query(
-        "DELETE FROM sensors WHERE sensors.id = ?"
+        "DELETE FROM sensors WHERE sensors.id = ?",
+        expected_params=(1,)
     )
 
 def test_orm_select(db_session, capquery):
@@ -88,13 +95,15 @@ def test_orm_select(db_session, capquery):
     fetched_panel = db_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
     
     assert fetched_panel is not None
+    capquery.assert_total_queries(1)
     capquery.assert_has_executed_query(
         "SELECT alarm_panels.id AS alarm_panels_id, "
         "alarm_panels.mac_address AS alarm_panels_mac_address, "
         "alarm_panels.is_online AS alarm_panels_is_online "
         "FROM alarm_panels "
         "WHERE alarm_panels.mac_address = ? "
-        "LIMIT ? OFFSET ?"
+        "LIMIT ? OFFSET ?",
+        expected_params=("22:33:44:55:66:77", 1, 0)
     )
 
 def test_avoid_n_plus_one_queries(db_session, capquery):
@@ -104,7 +113,8 @@ def test_avoid_n_plus_one_queries(db_session, capquery):
         sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
         panel.sensors.extend(sensors)
         db_session.add(panel)
-    db_session.commit()
+    db_session.flush()
+    db_session.expunge_all()
     
     capquery.statements.clear()
 
@@ -132,3 +142,27 @@ def test_avoid_n_plus_one_queries(db_session, capquery):
         "FROM alarm_panels "
         "LEFT OUTER JOIN sensors AS sensors_1 ON alarm_panels.id = sensors_1.panel_id"
     )
+
+def test_demonstrate_n_plus_one_problem(db_session, capquery):
+    # Setup: Seed the database with 3 AlarmPanels, each having 5 Sensors
+    for i in range(3):
+        panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
+        sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
+        panel.sensors.extend(sensors)
+        db_session.add(panel)
+    db_session.flush()
+    db_session.expunge_all()
+    
+    capquery.statements.clear()
+
+    # Query all AlarmPanels WITHOUT eager loading
+    panels = db_session.query(AlarmPanel).all()
+    
+    # Loop through the panels and access panel.sensors to trigger lazy loading
+    for panel in panels:
+        _ = panel.sensors
+        for sensor in panel.sensors:
+            _ = sensor.name
+
+    # Assert total queries is 4 (1 for panels + 3 for sensors of each panel)
+    capquery.assert_total_queries(4)

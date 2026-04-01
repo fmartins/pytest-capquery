@@ -31,7 +31,11 @@ class CapQueryWrapper(CaptureSqlStatements):
         out = []
         for stmt in self.statements:
             q_str = str(getattr(stmt, "statement", stmt))
-            out.append(f'"""\n{reformat_query(q_str)}\n"""')
+            params = getattr(stmt, "parameters", None)
+            formatted = f'"""\n{reformat_query(q_str)}\n"""'
+            if params is not None:
+                formatted += f'\nParameters: {params}'
+            out.append(formatted)
         return "\n\n".join(out)
 
     @property
@@ -66,10 +70,17 @@ class CapQueryWrapper(CaptureSqlStatements):
         executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
         assert not any(stmt.startswith("RELEASE SAVEPOINT") or stmt == "COMMIT" for stmt in executed_stmts), self.help
 
-    def assert_has_executed_query(self, expected_query: str):
-        executed_stmts = [str(getattr(stmt, "statement", stmt)) for stmt in self.statements]
+    def assert_has_executed_query(self, expected_query: str, expected_params=None):
         expected_formatted = reformat_query(expected_query)
-        assert any(expected_formatted == reformat_query(stmt) for stmt in executed_stmts), self.help
+        for stmt in self.statements:
+            stmt_query = str(getattr(stmt, "statement", stmt))
+            if expected_formatted == reformat_query(stmt_query):
+                if expected_params is not None:
+                    if getattr(stmt, "parameters", None) == expected_params:
+                        return
+                    continue
+                return
+        assert False, self.help
 
 
 @pytest.fixture

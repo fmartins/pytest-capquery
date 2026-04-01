@@ -10,10 +10,11 @@ def db_engine():
 
 def test_single_query(capquery, db_engine):
     with db_engine.connect() as conn:
-        conn.execute(text("SELECT 1"))
+        conn.execute(text("SELECT :x"), {"x": 1})
 
-    capquery.assert_executed_queries("SELECT 1")
-    capquery.assert_has_executed_query("select 1")
+    capquery.assert_total_queries(1)
+    capquery.assert_executed_queries("SELECT ?")
+    capquery.assert_has_executed_query("select ?", expected_params=(1,))
 
 
 def test_multiple_queries(capquery, db_engine):
@@ -21,6 +22,7 @@ def test_multiple_queries(capquery, db_engine):
         conn.execute(text("SELECT 1"))
         conn.execute(text("SELECT 2"))
 
+    capquery.assert_total_queries(2)
     capquery.assert_executed_queries("select    1", "select 2")
 
 
@@ -31,6 +33,7 @@ def test_commit(capquery, db_engine):
             with conn.begin_nested():
                 conn.execute(text("SELECT 2"))
 
+    capquery.assert_total_queries(4)
     capquery.assert_has_executed_query("SELECT 1")
     capquery.assert_has_executed_query("SELECT 2")
     capquery.assert_has_commit()
@@ -45,6 +48,7 @@ def test_nested_transaction_rollback(capquery, db_engine):
                 # Rollback the nested transaction; does NOT emit a RELEASE SAVEPOINT
                 nested.rollback()
 
+    capquery.assert_total_queries(4)
     capquery.assert_has_executed_query("SELECT 1")
     capquery.assert_has_executed_query("SELECT 2")
     capquery.assert_has_no_commit()
