@@ -1,11 +1,6 @@
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from pytest_capquery.plugin import capquery
-
-
-@pytest.fixture
-def db_engine():
-    return create_engine("sqlite:///:memory:")
 
 
 def test_single_query(capquery, db_engine):
@@ -52,3 +47,22 @@ def test_nested_transaction_rollback(capquery, db_engine):
     capquery.assert_has_executed_query("SELECT 1")
     capquery.assert_has_executed_query("SELECT 2")
     capquery.assert_has_no_commit()
+
+
+def test_complex_nested_transactions(capquery, db_engine):
+    with db_engine.connect() as conn:
+        with conn.begin():
+            conn.execute(text("SELECT 1"))
+            with conn.begin_nested():
+                conn.execute(text("SELECT 2"))
+                # simulates RELEASE SAVEPOINT
+            
+            with conn.begin_nested() as nested:
+                conn.execute(text("SELECT 3"))
+                nested.rollback() # simulates ROLLBACK TO SAVEPOINT
+
+    capquery.assert_total_queries(7)
+    capquery.assert_has_executed_query("SELECT 1")
+    capquery.assert_has_executed_query("SELECT 2")
+    capquery.assert_has_executed_query("SELECT 3")
+    capquery.assert_has_commit()

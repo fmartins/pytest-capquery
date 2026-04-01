@@ -1,25 +1,6 @@
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy.orm import joinedload
 
-from tests.models import Base, AlarmPanel, Sensor
-
-@pytest.fixture(scope="module")
-def db_engine():
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(engine)
-    yield engine
-    engine.dispose()
-
-@pytest.fixture(scope="function")
-def db_session(db_engine):
-    SessionMaker = sessionmaker(bind=db_engine)
-    session = SessionMaker()
-    yield session
-    session.rollback()
-    session.close()
-
+from tests.models import AlarmPanel, Sensor
 def test_orm_insert(db_session, capquery):
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor1 = Sensor(name="Front Door", sensor_type="Contact")
