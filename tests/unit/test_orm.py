@@ -1,6 +1,6 @@
 from sqlalchemy.orm import joinedload
 
-from tests.models import AlarmPanel, Sensor
+from tests.unit.models import AlarmPanel, Sensor
 
 def test_orm_insert(db_session, capquery):
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)

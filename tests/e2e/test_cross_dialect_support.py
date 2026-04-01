@@ -1,48 +1,94 @@
 import pytest
 from sqlalchemy import text
+from pytest_capquery.plugin import CapQueryWrapper
 
-def test_dialect_parameter_normalization(e2e_capquery, engine):
+
+def test_sqlite_cross_dialect_support(sqlite_engine):
     """
-    Documentation test for dialect parameter normalization:
-    When inserting/selecting values, SQLite DBAPI passes parameters as tuples,
-    while psycopg2 (PostgreSQL) passes them as lists or dicts.
-    With the `_normalize_params` fix, pytest-capquery safely unifies 
-    both structures into natively comparable sorting formats. Without it, 
-    this assertion would fail on PostgreSQL because psycopg2 returns a list `['Alice', 30]`, 
-    while the expected parameter is logically the tuple `('Alice', 30)` (if passed sequentially).
+    Test parameter normalization specifically for SQLite using native Positional execution.
     """
-    
-    with engine.connect() as conn:
+    with sqlite_engine.connect() as conn:
         with conn.begin():
             conn.execute(text("DROP TABLE IF EXISTS users"))
             conn.execute(text("CREATE TABLE users (name VARCHAR(50), age INT)"))
         
-        with conn.begin():
-            if engine.name == "sqlite":
+        with CapQueryWrapper(sqlite_engine) as capquery:
+            with conn.begin():
                 stmt_ins = "INSERT INTO users (name, age) VALUES (?, ?)"
                 stmt_sel = "SELECT * FROM users WHERE name = ? AND age = ?"
                 params = ("Alice", 30)
-            elif engine.name == "postgresql":
+
+                conn.exec_driver_sql(stmt_ins, params)
+                conn.exec_driver_sql(stmt_sel, params)
+
+    captured = capquery.statements
+    ins_stmt = next(s.statement for s in captured if "INSERT INTO" in s.statement.upper() and "USERS" in s.statement.upper())
+    sel_stmt = next(s.statement for s in captured if "SELECT " in s.statement.upper() and "USERS" in s.statement.upper())
+
+    capquery.assert_executed_queries(
+        "BEGIN",
+        (ins_stmt, ("Alice", 30)),
+        (sel_stmt, ("Alice", 30)),
+        "COMMIT"
+    )
+
+
+def test_postgres_cross_dialect_support(postgres_engine):
+    """
+    Without the plugin's `_normalize_params` fix, this assertion would fail 
+    on PostgreSQL because psycopg2 returns a list `['Alice', 30]`, 
+    while the expected parameter is logically the tuple `('Alice', 30)`.
+    """
+    with postgres_engine.connect() as conn:
+        with conn.begin():
+            conn.execute(text("DROP TABLE IF EXISTS users"))
+            conn.execute(text("CREATE TABLE users (name VARCHAR(50), age INT)"))
+        
+        with CapQueryWrapper(postgres_engine) as capquery:
+            with conn.begin():
                 stmt_ins = "INSERT INTO users (name, age) VALUES (%s, %s)"
                 stmt_sel = "SELECT * FROM users WHERE name = %s AND age = %s"
-                params = ("Alice", 30)  # Positional tuple for PostgreSQL
-            elif engine.name == "mysql":
+                # Ensure it strictly runs correctly against normalized expected queries.
+                params = ("Alice", 30)
+
+                conn.exec_driver_sql(stmt_ins, params)
+                conn.exec_driver_sql(stmt_sel, params)
+
+    captured = capquery.statements
+    ins_stmt = next(s.statement for s in captured if "INSERT INTO" in s.statement.upper() and "USERS" in s.statement.upper())
+    sel_stmt = next(s.statement for s in captured if "SELECT " in s.statement.upper() and "USERS" in s.statement.upper())
+
+    capquery.assert_executed_queries(
+        "BEGIN",
+        (ins_stmt, ("Alice", 30)),
+        (sel_stmt, ("Alice", 30)),
+        "COMMIT"
+    )
+
+
+def test_mysql_cross_dialect_support(mysql_engine):
+    """
+    Test parameter normalization specifically for MySQL.
+    """
+    with mysql_engine.connect() as conn:
+        with conn.begin():
+            conn.execute(text("DROP TABLE IF EXISTS users"))
+            conn.execute(text("CREATE TABLE users (name VARCHAR(50), age INT)"))
+        
+        with CapQueryWrapper(mysql_engine) as capquery:
+            with conn.begin():
                 stmt_ins = "INSERT INTO users (name, age) VALUES (%s, %s)"
                 stmt_sel = "SELECT * FROM users WHERE name = %s AND age = %s"
                 params = ("Alice", 30)
 
-            conn.exec_driver_sql(stmt_ins, params)
-            conn.exec_driver_sql(stmt_sel, params)
+                conn.exec_driver_sql(stmt_ins, params)
+                conn.exec_driver_sql(stmt_sel, params)
 
-    captured = e2e_capquery.statements
+    captured = capquery.statements
     ins_stmt = next(s.statement for s in captured if "INSERT INTO" in s.statement.upper() and "USERS" in s.statement.upper())
     sel_stmt = next(s.statement for s in captured if "SELECT " in s.statement.upper() and "USERS" in s.statement.upper())
 
-    e2e_capquery.assert_executed_queries(
-        "BEGIN",
-        "DROP TABLE IF EXISTS users",
-        "CREATE TABLE users (name VARCHAR(50), age INT)",
-        "COMMIT",
+    capquery.assert_executed_queries(
         "BEGIN",
         (ins_stmt, ("Alice", 30)),
         (sel_stmt, ("Alice", 30)),

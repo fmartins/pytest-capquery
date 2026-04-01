@@ -1,4 +1,4 @@
-.PHONY: setup test test-e2e db-up db-down clean
+.PHONY: setup test test-unit test-e2e db-up db-down clean
 
 setup:
 	pyenv install -s 3.13.0
@@ -6,9 +6,6 @@ setup:
 	python -m venv .venv
 	./.venv/bin/pip install -U pip
 	./.venv/bin/pip install -e '.[test]'
-
-test:
-	./.venv/bin/pytest -vvv tests/ --ignore=tests/e2e/
 
 db-up:
 	docker-compose up -d
@@ -18,6 +15,11 @@ db-up:
 
 db-down:
 	docker-compose down -v
+
+test: test-unit test-e2e
+
+test-unit:
+	./.venv/bin/pytest -vvv tests/unit/
 
 test-e2e: db-up
 	./.venv/bin/pytest -vvv tests/e2e/ || (make db-down && exit 1)
