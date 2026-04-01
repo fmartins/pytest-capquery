@@ -17,3 +17,10 @@ dependencies = [
 
 [project.entry-points.pytest11]
 capquery = "pytest_capquery.plugin"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "sqlalchemy-capture-sql",
+    "sqlparse"
+]
