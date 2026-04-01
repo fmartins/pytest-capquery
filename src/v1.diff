@@ -1,0 +1,702 @@
+diff --git a/.idea/.gitignore b/.idea/.gitignore
+new file mode 100644
+index 0000000..b58b603
+--- /dev/null
++++ b/.idea/.gitignore
+@@ -0,0 +1,5 @@
++# Default ignored files
++/shelf/
++/workspace.xml
++# Editor-based HTTP Client requests
++/httpRequests/
+diff --git a/.idea/inspectionProfiles/profiles_settings.xml b/.idea/inspectionProfiles/profiles_settings.xml
+new file mode 100644
+index 0000000..105ce2d
+--- /dev/null
++++ b/.idea/inspectionProfiles/profiles_settings.xml
+@@ -0,0 +1,6 @@
++<component name="InspectionProjectProfileManager">
++  <settings>
++    <option name="USE_PROJECT_PROFILE" value="false" />
++    <version value="1.0" />
++  </settings>
++</component>
+\ No newline at end of file
+diff --git a/.idea/misc.xml b/.idea/misc.xml
+new file mode 100644
+index 0000000..29aae04
+--- /dev/null
++++ b/.idea/misc.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="Black">
++    <option name="sdkName" value="Python 3.13 [pytest-capquery]" />
++  </component>
++  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 virtualenv at ~/dev/pytest-capquery/.venv" project-jdk-type="Python SDK" />
++</project>
+\ No newline at end of file
+diff --git a/.idea/modules.xml b/.idea/modules.xml
+new file mode 100644
+index 0000000..bc0e14b
+--- /dev/null
++++ b/.idea/modules.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectModuleManager">
++    <modules>
++      <module fileurl="file://$PROJECT_DIR$/.idea/pytest-capquery.iml" filepath="$PROJECT_DIR$/.idea/pytest-capquery.iml" />
++    </modules>
++  </component>
++</project>
+\ No newline at end of file
+diff --git a/.idea/pytest-capquery.iml b/.idea/pytest-capquery.iml
+new file mode 100644
+index 0000000..6c3e6e0
+--- /dev/null
++++ b/.idea/pytest-capquery.iml
+@@ -0,0 +1,11 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<module type="PYTHON_MODULE" version="4">
++  <component name="NewModuleRootManager">
++    <content url="file://$MODULE_DIR$">
++      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
++      <excludeFolder url="file://$MODULE_DIR$/.venv" />
++    </content>
++    <orderEntry type="jdk" jdkName="Python 3.13 virtualenv at ~/dev/pytest-capquery/.venv" jdkType="Python SDK" />
++    <orderEntry type="sourceFolder" forTests="false" />
++  </component>
++</module>
+\ No newline at end of file
+diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+new file mode 100644
+index 0000000..35eb1dd
+--- /dev/null
++++ b/.idea/vcs.xml
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="" vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file
+diff --git a/.python-version b/.python-version
+new file mode 100644
+index 0000000..4eba2a6
+--- /dev/null
++++ b/.python-version
+@@ -0,0 +1 @@
++3.13.0
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..d46e140
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,16 @@
++.PHONY: setup test clean
++
++setup:
++	pyenv install -s 3.13.0
++	pyenv local 3.13.0
++	python -m venv .venv
++	./.venv/bin/pip install -U pip
++	./.venv/bin/pip install -e '.[test]'
++
++test:
++	./.venv/bin/pytest -vvv tests/
++
++clean:
++	rm -rf .venv
++	find . -type d -name "__pycache__" -exec rm -rf {} +
++	rm -rf build/ dist/ *.egg-info/ .pytest_cache/
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+index 0000000..4d933cf
+--- /dev/null
++++ b/pyproject.toml
+@@ -0,0 +1,26 @@
++[build-system]
++requires = ["setuptools>=61.0"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "pytest-capquery"
++version = "0.1.0"
++description = "A pytest fixture for high-precision SQL testing in SQLAlchemy."
++readme = "README.md"
++requires-python = ">=3.13"
++dependencies = [
++    "pytest",
++    "sqlalchemy",
++    "sqlparse",
++    "sqlalchemy-capture-sql"
++]
++
++[project.entry-points.pytest11]
++capquery = "pytest_capquery.plugin"
++
++[project.optional-dependencies]
++test = [
++    "pytest",
++    "sqlalchemy-capture-sql",
++    "sqlparse"
++]
+diff --git a/src/pytest_capquery/__init__.py b/src/pytest_capquery/__init__.py
+new file mode 100644
+index 0000000..deae50a
+--- /dev/null
++++ b/src/pytest_capquery/__init__.py
+@@ -0,0 +1 @@
++# Empty init file
+diff --git a/src/pytest_capquery/plugin.py b/src/pytest_capquery/plugin.py
+new file mode 100644
+index 0000000..6ad4f4c
+--- /dev/null
++++ b/src/pytest_capquery/plugin.py
+@@ -0,0 +1,139 @@
++import functools
++
++import pytest
++import sqlparse
++from sqlalchemy import event
++from sqlalchemy_capture_sql import CaptureSqlStatements
++
++format_query = functools.partial(sqlparse.format, reindent=True, keyword_case="upper")
++
++
++def reformat_query(query: str) -> str:
++    query = query.strip()
++    parsed = sqlparse.parse(query)
++
++    statements = [p for p in parsed if str(p).strip()]
++    if len(statements) > 1:
++        raise ValueError("Only one query is allowed.")
++
++    if not statements:
++        return ""
++
++    return format_query(query)
++
++
++class TxEvent:
++    def __init__(self, stmt):
++        self.statement = stmt
++        self.parameters = None
++        self.idx = id(self)
++        self.duration = 0.0
++        self.first_table = "N/A"
++        self.sql_type = "EVENT"
++    
++    def set_tst_next(self, now):
++        pass
++
++
++class CapQueryWrapper(CaptureSqlStatements):
++    def __enter__(self):
++        super().__enter__()
++        
++        self._listeners = {
++            'begin': lambda c: self.statements.append(TxEvent("BEGIN")),
++            'commit': lambda c: self.statements.append(TxEvent("COMMIT")),
++            'rollback': lambda c: self.statements.append(TxEvent("ROLLBACK")),
++        }
++        for name, fn in self._listeners.items():
++            event.listen(self.engine, name, fn)
++            
++        return self
++
++    def __exit__(self, exc_type, exc_val, exc_tb):
++        for name, fn in self._listeners.items():
++            event.remove(self.engine, name, fn)
++        return super().__exit__(exc_type, exc_val, exc_tb)
++
++    @property
++    def queries_history(self) -> str:
++        """
++        Reformats all captured statements and outputs them in a copy-and-paste
++        friendly string format (triple quotes).
++        """
++        out = []
++        for stmt in self.statements:
++            q_str = str(getattr(stmt, "statement", stmt))
++            params = getattr(stmt, "parameters", None)
++            formatted = f'"""\n{reformat_query(q_str)}\n"""'
++            if params is not None:
++                formatted += f'\nParameters: {params}'
++            out.append(formatted)
++        return "\n\n".join(out)
++
++    @property
++    def help(self) -> str:
++        return f"Captured queries:\n{self.queries_history}"
++
++    def assert_executed_queries(self, *expected_queries, has_commit=False, strict=True):
++        if strict:
++            self.assert_total_queries(len(expected_queries))
++
++        for i, expected in enumerate(expected_queries):
++            if i >= len(self.statements):
++                assert False, self.help
++                
++            actual_stmt = self.statements[i]
++            actual_q_str = str(getattr(actual_stmt, "statement", actual_stmt))
++            
++            if isinstance(expected, tuple):
++                expected_q_str, expected_params = expected
++            else:
++                expected_q_str, expected_params = expected, None
++
++            expected_formatted = reformat_query(expected_q_str)
++            actual_formatted = reformat_query(actual_q_str)
++            assert expected_formatted == actual_formatted, self.help
++            
++            if expected_params is not None:
++                actual_params = getattr(actual_stmt, "parameters", None)
++                assert expected_params == actual_params, self.help
++
++        if has_commit:
++            self.assert_has_commit()
++
++    def assert_total_queries(self, expected_total_queries: int):
++        assert len(self.statements) == expected_total_queries, self.help
++
++    def assert_has_begin(self):
++        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
++        assert any(stmt == "BEGIN" for stmt in executed_stmts), self.help
++
++    def assert_has_commit(self):
++        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
++        assert any(stmt == "COMMIT" for stmt in executed_stmts), self.help
++
++    def assert_has_rollback(self):
++        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
++        assert any(stmt == "ROLLBACK" for stmt in executed_stmts), self.help
++
++    def assert_has_no_commit(self):
++        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
++        assert not any(stmt == "COMMIT" for stmt in executed_stmts), self.help
++
++    def assert_has_executed_query(self, expected_query: str, expected_params=None):
++        expected_formatted = reformat_query(expected_query)
++        for stmt in self.statements:
++            stmt_query = str(getattr(stmt, "statement", stmt))
++            if expected_formatted == reformat_query(stmt_query):
++                if expected_params is not None:
++                    if getattr(stmt, "parameters", None) == expected_params:
++                        return
++                    continue
++                return
++        assert False, self.help
++
++
++@pytest.fixture
++def capquery(db_engine):
++    with CapQueryWrapper(db_engine) as captured:
++        yield captured
+\ No newline at end of file
+diff --git a/tests/__init__.py b/tests/__init__.py
+new file mode 100644
+index 0000000..6fc371b
+--- /dev/null
++++ b/tests/__init__.py
+@@ -0,0 +1 @@
++# Empty init file for tests
+diff --git a/tests/conftest.py b/tests/conftest.py
+new file mode 100644
+index 0000000..f3dff9a
+--- /dev/null
++++ b/tests/conftest.py
+@@ -0,0 +1,20 @@
++import pytest
++from sqlalchemy import create_engine
++from sqlalchemy.orm.session import sessionmaker
++
++from tests.models import Base
++
++@pytest.fixture(scope="module")
++def db_engine():
++    engine = create_engine("sqlite:///:memory:", echo=False)
++    Base.metadata.create_all(engine)
++    yield engine
++    engine.dispose()
++
++@pytest.fixture(scope="function")
++def db_session(db_engine):
++    SessionMaker = sessionmaker(bind=db_engine)
++    session = SessionMaker()
++    yield session
++    session.rollback()
++    session.close()
+diff --git a/tests/models.py b/tests/models.py
+new file mode 100644
+index 0000000..0b0f168
+--- /dev/null
++++ b/tests/models.py
+@@ -0,0 +1,23 @@
++from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
++from sqlalchemy.orm import declarative_base, relationship
++
++Base = declarative_base()
++
++class AlarmPanel(Base):
++    __tablename__ = 'alarm_panels'
++
++    id = Column(Integer, primary_key=True)
++    mac_address = Column(String, nullable=False, unique=True)
++    is_online = Column(Boolean, default=False)
++
++    sensors = relationship("Sensor", back_populates="panel", cascade="all, delete-orphan")
++
++class Sensor(Base):
++    __tablename__ = 'sensors'
++
++    id = Column(Integer, primary_key=True)
++    panel_id = Column(Integer, ForeignKey('alarm_panels.id'), nullable=False)
++    name = Column(String, nullable=False)
++    sensor_type = Column(String, nullable=False)
++
++    panel = relationship("AlarmPanel", back_populates="sensors")
+diff --git a/tests/test_core_assertions.py b/tests/test_core_assertions.py
+new file mode 100644
+index 0000000..e7a8cec
+--- /dev/null
++++ b/tests/test_core_assertions.py
+@@ -0,0 +1,132 @@
++import pytest
++from sqlalchemy import text
++from pytest_capquery.plugin import capquery
++
++
++def test_single_query(capquery, db_engine):
++    with db_engine.connect() as conn:
++        conn.execute(text("SELECT :x"), {"x": 1})
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        ("SELECT ?", (1,)),
++        "ROLLBACK"
++    )
++
++
++def test_multiple_queries(capquery, db_engine):
++    with db_engine.connect() as conn:
++        conn.execute(text("SELECT 1"))
++        conn.execute(text("SELECT 2"))
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "SELECT 2",
++        "ROLLBACK"
++    )
++
++
++def test_commit(capquery, db_engine):
++    with db_engine.connect() as conn:
++        with conn.begin():
++            conn.execute(text("SELECT 1"))
++            with conn.begin_nested():
++                conn.execute(text("SELECT 2"))
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "SAVEPOINT sa_savepoint_1",
++        "SELECT 2",
++        "RELEASE SAVEPOINT sa_savepoint_1",
++        "COMMIT"
++    )
++
++
++def test_nested_transaction_rollback(capquery, db_engine):
++    with db_engine.connect() as conn:
++        with conn.begin():
++            conn.execute(text("SELECT 1"))
++            with conn.begin_nested() as nested:
++                conn.execute(text("SELECT 2"))
++                # Rollback the nested transaction; does NOT emit a RELEASE SAVEPOINT
++                nested.rollback()
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "SAVEPOINT sa_savepoint_1",
++        "SELECT 2",
++        "ROLLBACK TO SAVEPOINT sa_savepoint_1",
++        "COMMIT"
++    )
++
++
++def test_complex_nested_transactions(capquery, db_engine):
++    with db_engine.connect() as conn:
++        with conn.begin():
++            conn.execute(text("SELECT 1"))
++            with conn.begin_nested():
++                conn.execute(text("SELECT 2"))
++            
++            with conn.begin_nested() as nested:
++                conn.execute(text("SELECT 3"))
++                nested.rollback()
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "SAVEPOINT sa_savepoint_1",
++        "SELECT 2",
++        "RELEASE SAVEPOINT sa_savepoint_1",
++        "SAVEPOINT sa_savepoint_2",
++        "SELECT 3",
++        "ROLLBACK TO SAVEPOINT sa_savepoint_2",
++        "COMMIT"
++    )
++
++
++def test_transaction_begin_commit(capquery, db_engine):
++    with db_engine.begin() as conn:
++        conn.execute(text("SELECT 1"))
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "COMMIT"
++    )
++
++
++def test_transaction_rollback(capquery, db_engine):
++    conn = db_engine.connect()
++    trans = conn.begin()
++    conn.execute(text("SELECT 1"))
++    trans.rollback()
++    conn.close()
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "ROLLBACK"
++    )
++
++
++def test_nested_partial_rollback(capquery, db_engine):
++    with db_engine.connect() as conn:
++        with conn.begin():
++            conn.execute(text("SELECT 1"))
++            with conn.begin_nested() as nested:
++                conn.execute(text("SELECT 2"))
++                nested.rollback()
++            conn.execute(text("SELECT 3"))
++
++    capquery.assert_executed_queries(
++        "BEGIN",
++        "SELECT 1",
++        "SAVEPOINT sa_savepoint_1",
++        "SELECT 2",
++        "ROLLBACK TO SAVEPOINT sa_savepoint_1",
++        "SELECT 3",
++        "COMMIT"
++    )
+\ No newline at end of file
+diff --git a/tests/test_orm.py b/tests/test_orm.py
+new file mode 100644
+index 0000000..afff447
+--- /dev/null
++++ b/tests/test_orm.py
+@@ -0,0 +1,197 @@
++from sqlalchemy.orm import joinedload
++
++from tests.models import AlarmPanel, Sensor
++
++def test_orm_insert(db_session, capquery):
++    panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
++    sensor1 = Sensor(name="Front Door", sensor_type="Contact")
++    sensor2 = Sensor(name="Living Room", sensor_type="Motion")
++    panel.sensors.extend([sensor1, sensor2])
++    
++    db_session.add(panel)
++    
++    capquery.statements.clear()
++    db_session.flush()
++    
++    capquery.assert_executed_queries(
++        "BEGIN",
++        (
++            "INSERT INTO alarm_panels (mac_address, is_online) VALUES (?, ?)",
++            ("00:11:22:33:44:55", 1)
++        ),
++        (
++            "INSERT INTO sensors (panel_id, name, sensor_type) VALUES (?, ?, ?) RETURNING id",
++            (1, "Front Door", "Contact")
++        ),
++        (
++            "INSERT INTO sensors (panel_id, name, sensor_type) VALUES (?, ?, ?) RETURNING id",
++            (1, "Living Room", "Motion")
++        )
++    )
++
++def test_orm_update(db_session, capquery):
++    # Setup
++    panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=False)
++    db_session.add(panel)
++    db_session.flush()
++    capquery.statements.clear()
++
++    # Query and update
++    panel = db_session.query(AlarmPanel).filter_by(mac_address="AA:BB:CC:DD:EE:FF").first()
++    panel.is_online = True
++    db_session.flush()
++
++    capquery.assert_executed_queries(
++        (
++            "SELECT alarm_panels.id AS alarm_panels_id, "
++            "alarm_panels.mac_address AS alarm_panels_mac_address, "
++            "alarm_panels.is_online AS alarm_panels_is_online "
++            "FROM alarm_panels "
++            "WHERE alarm_panels.mac_address = ? "
++            "LIMIT ? OFFSET ?",
++            ("AA:BB:CC:DD:EE:FF", 1, 0)
++        ),
++        (
++            "UPDATE alarm_panels SET is_online=? WHERE alarm_panels.id = ?",
++            (1, 1)
++        )
++    )
++
++def test_orm_delete(db_session, capquery):
++    # Setup
++    panel = AlarmPanel(mac_address="11:22:33:44:55:66", is_online=True)
++    sensor = Sensor(name="Back Door", sensor_type="Contact")
++    panel.sensors.append(sensor)
++    db_session.add(panel)
++    db_session.flush()
++    
++    capquery.statements.clear()
++
++    # Query and delete
++    sensor_to_delete = db_session.query(Sensor).filter_by(name="Back Door").first()
++    db_session.delete(sensor_to_delete)
++    db_session.flush()
++
++    capquery.assert_executed_queries(
++        (
++            "SELECT sensors.id AS sensors_id, "
++            "sensors.panel_id AS sensors_panel_id, "
++            "sensors.name AS sensors_name, "
++            "sensors.sensor_type AS sensors_sensor_type "
++            "FROM sensors "
++            "WHERE sensors.name = ? "
++            "LIMIT ? OFFSET ?",
++            ("Back Door", 1, 0)
++        ),
++        (
++            "DELETE FROM sensors WHERE sensors.id = ?",
++            (1,)
++        )
++    )
++
++def test_orm_select(db_session, capquery):
++    # Setup
++    panel = AlarmPanel(mac_address="22:33:44:55:66:77", is_online=False)
++    db_session.add(panel)
++    db_session.flush()
++
++    capquery.statements.clear()
++
++    # Query
++    fetched_panel = db_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
++    
++    assert fetched_panel is not None
++    capquery.assert_executed_queries(
++        (
++            "SELECT alarm_panels.id AS alarm_panels_id, "
++            "alarm_panels.mac_address AS alarm_panels_mac_address, "
++            "alarm_panels.is_online AS alarm_panels_is_online "
++            "FROM alarm_panels "
++            "WHERE alarm_panels.mac_address = ? "
++            "LIMIT ? OFFSET ?",
++            ("22:33:44:55:66:77", 1, 0)
++        )
++    )
++
++def test_avoid_n_plus_one_queries(db_session, capquery):
++    # Setup
++    for i in range(3):
++        panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
++        sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
++        panel.sensors.extend(sensors)
++        db_session.add(panel)
++    db_session.flush()
++    db_session.expunge_all()
++    
++    capquery.statements.clear()
++
++    panels = db_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).all()
++    
++    for panel in panels:
++        _ = panel.sensors
++        for sensor in panel.sensors:
++            _ = sensor.name
++
++    capquery.assert_executed_queries(
++        "SELECT alarm_panels.id AS alarm_panels_id, "
++        "alarm_panels.mac_address AS alarm_panels_mac_address, "
++        "alarm_panels.is_online AS alarm_panels_is_online, "
++        "sensors_1.id AS sensors_1_id, "
++        "sensors_1.panel_id AS sensors_1_panel_id, "
++        "sensors_1.name AS sensors_1_name, "
++        "sensors_1.sensor_type AS sensors_1_sensor_type "
++        "FROM alarm_panels "
++        "LEFT OUTER JOIN sensors AS sensors_1 ON alarm_panels.id = sensors_1.panel_id"
++    )
++
++def test_demonstrate_n_plus_one_problem(db_session, capquery):
++    for i in range(3):
++        panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
++        sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
++        panel.sensors.extend(sensors)
++        db_session.add(panel)
++    db_session.flush()
++    db_session.expunge_all()
++    
++    capquery.statements.clear()
++
++    panels = db_session.query(AlarmPanel).all()
++    
++    for panel in panels:
++        _ = panel.sensors
++        for sensor in panel.sensors:
++            _ = sensor.name
++
++    capquery.assert_executed_queries(
++        "SELECT alarm_panels.id AS alarm_panels_id, "
++        "alarm_panels.mac_address AS alarm_panels_mac_address, "
++        "alarm_panels.is_online AS alarm_panels_is_online "
++        "FROM alarm_panels",
++        (
++            "SELECT sensors.id AS sensors_id, "
++            "sensors.panel_id AS sensors_panel_id, "
++            "sensors.name AS sensors_name, "
++            "sensors.sensor_type AS sensors_sensor_type "
++            "FROM sensors "
++            "WHERE ? = sensors.panel_id",
++            (1,)
++        ),
++        (
++            "SELECT sensors.id AS sensors_id, "
++            "sensors.panel_id AS sensors_panel_id, "
++            "sensors.name AS sensors_name, "
++            "sensors.sensor_type AS sensors_sensor_type "
++            "FROM sensors "
++            "WHERE ? = sensors.panel_id",
++            (2,)
++        ),
++        (
++            "SELECT sensors.id AS sensors_id, "
++            "sensors.panel_id AS sensors_panel_id, "
++            "sensors.name AS sensors_name, "
++            "sensors.sensor_type AS sensors_sensor_type "
++            "FROM sensors "
++            "WHERE ? = sensors.panel_id",
++            (3,)
++        )
++    )
