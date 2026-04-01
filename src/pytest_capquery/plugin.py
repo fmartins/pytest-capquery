@@ -43,9 +43,6 @@ class CapQueryWrapper(CaptureSqlStatements):
             'begin': lambda c: self.statements.append(TxEvent("BEGIN")),
             'commit': lambda c: self.statements.append(TxEvent("COMMIT")),
             'rollback': lambda c: self.statements.append(TxEvent("ROLLBACK")),
-            'savepoint': lambda c, name: self.statements.append(TxEvent(f"SAVEPOINT {name}")),
-            'rollback_savepoint': lambda c, name, ctx: self.statements.append(TxEvent(f"ROLLBACK TO SAVEPOINT {name}")),
-            'release_savepoint': lambda c, name, ctx: self.statements.append(TxEvent(f"RELEASE SAVEPOINT {name}")),
         }
         for name, fn in self._listeners.items():
             event.listen(self.engine, name, fn)
@@ -78,18 +75,28 @@ class CapQueryWrapper(CaptureSqlStatements):
         return f"Captured queries:\n{self.queries_history}"
 
     def assert_executed_queries(self, *expected_queries, has_commit=False, strict=True):
-        executed_stmts = [str(getattr(stmt, "statement", stmt)) for stmt in self.statements]
-
         if strict:
             self.assert_total_queries(len(expected_queries))
 
         for i, expected in enumerate(expected_queries):
-            if i < len(executed_stmts):
-                expected_formatted = reformat_query(expected)
-                actual_formatted = reformat_query(executed_stmts[i])
-                assert expected_formatted == actual_formatted, self.help
-            else:
+            if i >= len(self.statements):
                 assert False, self.help
+                
+            actual_stmt = self.statements[i]
+            actual_q_str = str(getattr(actual_stmt, "statement", actual_stmt))
+            
+            if isinstance(expected, tuple):
+                expected_q_str, expected_params = expected
+            else:
+                expected_q_str, expected_params = expected, None
+
+            expected_formatted = reformat_query(expected_q_str)
+            actual_formatted = reformat_query(actual_q_str)
+            assert expected_formatted == actual_formatted, self.help
+            
+            if expected_params is not None:
+                actual_params = getattr(actual_stmt, "parameters", None)
+                assert expected_params == actual_params, self.help
 
         if has_commit:
             self.assert_has_commit()
