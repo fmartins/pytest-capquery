@@ -1,12 +1,16 @@
 .DEFAULT_GOAL := help
-.PHONY: setup test test-unit test-e2e db-up db-down clean format check-format help
+.PHONY: setup setup-env install test test-unit test-e2e db-up db-down clean format check-format help
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-setup: ## Install the package and dependencies
+setup: setup-env install ## Full local setup: install pyenv python, create venv, and install deps
+
+setup-env: ## Install local python version via pyenv (macOS/Linux dev only)
 	pyenv install -s 3.13.0
 	pyenv local 3.13.0
+
+install: ## Create venv and install dependencies
 	python -m venv .venv
 	./.venv/bin/pip install -U pip
 	./.venv/bin/pip install -e '.[test]'

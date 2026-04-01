@@ -21,12 +21,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        # Bypass 'make setup' since python is already installed.
-        # Create the .venv manually so downstream Makefile targets work.
-        run: |
-          python -m venv .venv
-          ./.venv/bin/pip install -U pip
-          ./.venv/bin/pip install -e '.[test]'
+        run: make install
 
       - name: Check code formatting
         run: make check-format
