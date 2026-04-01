@@ -15,6 +15,9 @@ def reformat_query(query: str) -> str:
     if len(statements) > 1:
         raise ValueError("Only one query is allowed.")
 
+    if not statements:
+        return ""
+
     return format_query(query)
 
 
@@ -56,8 +59,12 @@ class CapQueryWrapper(CaptureSqlStatements):
         assert len(self.statements) == expected_total_queries, self.help
 
     def assert_has_commit(self):
-        executed_stmts = [str(getattr(stmt, "statement", stmt)) for stmt in self.statements]
-        assert any("RELEASE SAVEPOINT" in stmt for stmt in executed_stmts), self.help
+        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
+        assert any(stmt.startswith("RELEASE SAVEPOINT") or stmt == "COMMIT" for stmt in executed_stmts), self.help
+
+    def assert_has_no_commit(self):
+        executed_stmts = [str(getattr(stmt, "statement", stmt)).strip().upper() for stmt in self.statements]
+        assert not any(stmt.startswith("RELEASE SAVEPOINT") or stmt == "COMMIT" for stmt in executed_stmts), self.help
 
     def assert_has_executed_query(self, expected_query: str):
         executed_stmts = [str(getattr(stmt, "statement", stmt)) for stmt in self.statements]
