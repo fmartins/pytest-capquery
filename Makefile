@@ -16,13 +16,13 @@ install: ## Create venv and install dependencies
 	./.venv/bin/pip install -e '.[test]'
 
 db-up: ## Start Docker Compose databases
-	docker-compose up -d
+	docker compose up -d
 	@echo "Waiting for databases to be ready..."
 	@sleep 10
 	@echo "Databases are ready."
 
 db-down: ## Tear down Docker Compose databases
-	docker-compose down -v
+	docker compose down -v
 
 test: test-unit test-e2e ## Run all tests
 
