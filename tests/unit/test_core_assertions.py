@@ -3,8 +3,8 @@ from sqlalchemy import text
 from pytest_capquery.plugin import capquery
 
 
-def test_single_query(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_single_query(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         conn.execute(text("SELECT :x"), {"x": 1})
 
     capquery.assert_executed_queries(
@@ -14,8 +14,8 @@ def test_single_query(capquery, db_engine):
     )
 
 
-def test_multiple_queries(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_multiple_queries(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         conn.execute(text("SELECT 1"))
         conn.execute(text("SELECT 2"))
 
@@ -27,8 +27,8 @@ def test_multiple_queries(capquery, db_engine):
     )
 
 
-def test_commit(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_commit(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         with conn.begin():
             conn.execute(text("SELECT 1"))
             with conn.begin_nested():
@@ -44,8 +44,8 @@ def test_commit(capquery, db_engine):
     )
 
 
-def test_nested_transaction_rollback(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_nested_transaction_rollback(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         with conn.begin():
             conn.execute(text("SELECT 1"))
             with conn.begin_nested() as nested:
@@ -63,8 +63,8 @@ def test_nested_transaction_rollback(capquery, db_engine):
     )
 
 
-def test_complex_nested_transactions(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_complex_nested_transactions(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         with conn.begin():
             conn.execute(text("SELECT 1"))
             with conn.begin_nested():
@@ -87,8 +87,8 @@ def test_complex_nested_transactions(capquery, db_engine):
     )
 
 
-def test_transaction_begin_commit(capquery, db_engine):
-    with db_engine.begin() as conn:
+def test_transaction_begin_commit(capquery, sqlite_engine):
+    with sqlite_engine.begin() as conn:
         conn.execute(text("SELECT 1"))
 
     capquery.assert_executed_queries(
@@ -98,8 +98,8 @@ def test_transaction_begin_commit(capquery, db_engine):
     )
 
 
-def test_transaction_rollback(capquery, db_engine):
-    conn = db_engine.connect()
+def test_transaction_rollback(capquery, sqlite_engine):
+    conn = sqlite_engine.connect()
     trans = conn.begin()
     conn.execute(text("SELECT 1"))
     trans.rollback()
@@ -112,8 +112,8 @@ def test_transaction_rollback(capquery, db_engine):
     )
 
 
-def test_nested_partial_rollback(capquery, db_engine):
-    with db_engine.connect() as conn:
+def test_nested_partial_rollback(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
         with conn.begin():
             conn.execute(text("SELECT 1"))
             with conn.begin_nested() as nested:

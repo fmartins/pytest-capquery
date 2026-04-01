@@ -157,6 +157,6 @@ class CapQueryWrapper(CaptureSqlStatements):
 
 
 @pytest.fixture
-def capquery(db_engine: Engine) -> CapQueryWrapper:
-    with CapQueryWrapper(db_engine) as captured:
+def capquery(sqlite_engine: Engine) -> CapQueryWrapper:
+    with CapQueryWrapper(sqlite_engine) as captured:
         yield captured
