@@ -23,5 +23,8 @@ jobs:
       - name: Install dependencies and setup
         run: make setup
 
+      - name: Run unit tests
+        run: make test-unit
+
       - name: Run E2E tests and strict dialect matrix
         run: make test-e2e
