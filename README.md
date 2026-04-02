@@ -206,7 +206,7 @@ To get your local environment ready for contribution, run the following commands
 
 ```bash
 # Clone the repository
-git clone [https://github.com/fmartins/pytest-capquery.git](https://github.com/fmartins/pytest-capquery.git)
+git clone https://github.com/fmartins/pytest-capquery.git
 cd pytest-capquery
 
 # Install Python, dependencies, and pre-commit hooks
