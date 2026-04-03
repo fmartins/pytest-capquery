@@ -1,24 +1,39 @@
 # pytest-capquery
 
 ![Build Status](https://github.com/fmartins/pytest-capquery/actions/workflows/ci.yml/badge.svg)
+[![Codecov](https://codecov.io/gh/fmartins/pytest-capquery/graph/badge.svg)](https://codecov.io/gh/fmartins/pytest-capquery)
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)
 
 Testing your business logic is good, but **testing your database interactions is critical**.
+
 `pytest-capquery` treats your SQL queries as first-class citizens in your test suite. By asserting
 the exact queries executed, you create living documentation of what is truly happening behind the
 scenes. This guarantees deterministic performance, catches N+1 regressions instantly, and ensures
 your application behaves exactly as intended.
 
-`pytest-capquery` is a strict, strongly-typed SQLAlchemy pytest plugin designed to enforce exact
-chronological query execution. It asserts precise SQL strings, parameter bindings, and transaction
-boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`).
+Designed for modern Python applications, `pytest-capquery` is a strict, strongly-typed SQLAlchemy
+pytest plugin that enforces exact chronological query execution, validating precise SQL strings,
+parameter bindings, and transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`).
+
+## Key Features
+
+- **Contextual Isolation:** Use the `capture()` context manager to track queries locally without
+  global state leakage or manual resets.
+- **Strict Timeline Assertion:** Validate the exact chronological sequence of SQL strings and
+  transaction events.
+- **Heuristic N+1 Guards:** Use "loose assertion" mode to enforce maximum query counts without
+  binding tests to fragile ORM implementation details.
+- **Deterministic Parameter Matching:** Ensures cross-dialect equality for parameter structures.
+- **Async Ready:** Seamlessly integrates with standard and `AsyncSession` environments.
 
 ## Used By
 
 `pytest-capquery` is actively used to protect the database performance of:
 
 - [macafe CLOUD](https://macafe.cloud/)
+
+---
 
 ## Installation
 
@@ -30,163 +45,58 @@ pip install pytest-capquery
 
 ## Quick Start
 
-The `capquery` fixture captures all SQLAlchemy statements executed by your code. You can use it to
-assert precise SQL queries, exact bound parameters, and transaction events in deterministic order.
+The `capquery` fixture captures all SQLAlchemy statements executed by your code. The best practice
+is to use the `capture()` context manager to isolate specific execution phases.
 
-Here is how you can use the `capquery` fixture alongside your SQLAlchemy models (e.g., `AlarmPanel`
-and `Sensor`):
+### 1. Preventing N+1 Queries (Loose Assertion)
+
+If you want to protect a block of code against N+1 regressions without hardcoding exact SQL strings,
+you can enforce a strict expected query count at the context boundary:
 
 ```python
-from sqlalchemy.orm import Session
-from tests.models import AlarmPanel, Sensor
-
-def test_insert_alarm_panel(db_session: Session, capquery):
-    # Setup
-    panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
-    sensor = Sensor(name="Front Door", sensor_type="Contact")
-    panel.sensors.append(sensor)
-
-    db_session.add(panel)
-
-    # Clear any unrelated previous queries
-    capquery.statements.clear()
-
-    # Trigger database flush
-    db_session.flush()
-
-    # Assert exact chronological execution, parameters, and transaction boundaries
-    capquery.assert_executed_queries(
-        "BEGIN",
-        (
-            # language=SQL
-            """
-            INSERT INTO alarm_panels (mac_address, is_online)
-            VALUES (?, ?)
-            """,
-            ("00:11:22:33:44:55", 1)
-        ),
-        (
-            # language=SQL
-            """
-            INSERT INTO sensors (panel_id, name, sensor_type)
-            VALUES (?, ?, ?)
-            """,
-            (1, "Front Door", "Contact")
-        )
-    )
+def test_fetch_users(db_session, capquery):
+    # Enforce that exactly 1 query is executed inside this block.
+    # If a lazy-loading loop triggers extra queries, this will raise an AssertionError.
+    with capquery.capture(expected_count=1):
+        users = db_session.query(User).all()
+        for user in users:
+            _ = user.address
 ```
 
-## The N+1 Problem Showcase
+### 2. Asserting Exact SQL Execution (Strict Assertion)
 
-One of the most powerful use cases for `pytest-capquery` is catching performance regressions
-associated with the 1+N lazy-loading problem. It clearly contrasts inefficient DB loops with
-optimized joined-loading.
-
-### Catching a 1+N Lazy-Loading Regression
-
-If a developer drops the `joinedload` behavior, `pytest-capquery` will expose the exact 1+N
-lazy-loading queries:
+For mission-critical operations, you can capture a phase and rigorously assert the exact SQL and
+parameters executed:
 
 ```python
-def test_demonstrate_n_plus_one_problem(db_session: Session, capquery):
-    capquery.statements.clear()
+def test_update_user_status(db_session, capquery):
+    with capquery.capture() as phase:
+        user = db_session.query(User).filter_by(id=1).first()
+        user.status = "active"
+        db_session.commit()
 
-    # Query all panels WITHOUT eagerly loading sensors
-    panels = db_session.query(AlarmPanel).all()
-
-    # Accessing the lazy relationship triggers N+1 queries
-    for panel in panels:
-        _ = panel.sensors
-
-    # Asserting the resulting N+1 problem
-    capquery.assert_executed_queries(
-        # The 1 Query
-        # language=SQL
-        """
-        SELECT
-            alarm_panels.id AS alarm_panels_id,
-            alarm_panels.mac_address AS alarm_panels_mac_address,
-            alarm_panels.is_online AS alarm_panels_is_online
-        FROM alarm_panels
-        """,
-        # The +N Queries
+    # Verify the precise chronological timeline of the transaction
+    phase.assert_executed_queries(
+        "BEGIN",
         (
-            # language=SQL
             """
-            SELECT
-                sensors.id AS sensors_id,
-                sensors.panel_id AS sensors_panel_id,
-                sensors.name AS sensors_name,
-                sensors.sensor_type AS sensors_sensor_type
-            FROM sensors
-            WHERE ? = sensors.panel_id
+            SELECT users.id, users.status
+            FROM users
+            WHERE users.id = ?
             """,
             (1,)
         ),
         (
-            # language=SQL
             """
-            SELECT
-                sensors.id AS sensors_id,
-                sensors.panel_id AS sensors_panel_id,
-                sensors.name AS sensors_name,
-                sensors.sensor_type AS sensors_sensor_type
-            FROM sensors
-            WHERE ? = sensors.panel_id
+            UPDATE users SET status=? WHERE users.id = ?
             """,
-            (2,)
+            ("active", 1)
         ),
-        (
-            # language=SQL
-            """
-            SELECT
-                sensors.id AS sensors_id,
-                sensors.panel_id AS sensors_panel_id,
-                sensors.name AS sensors_name,
-                sensors.sensor_type AS sensors_sensor_type
-            FROM sensors
-            WHERE ? = sensors.panel_id
-            """,
-            (3,)
-        )
+        "COMMIT"
     )
 ```
 
-### Fixing the N+1 problem with joined-loading
-
-When developers optimize their query with `joinedload`, `pytest-capquery` verifies the problem is
-fixed:
-
-```python
-from sqlalchemy.orm import joinedload
-
-def test_avoid_n_plus_one_queries(db_session: Session, capquery):
-    capquery.statements.clear()
-
-    # Query WITH eager loading
-    panels = db_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).all()
-
-    # Accessing the relationship no longer triggers additional queries
-    for panel in panels:
-        _ = panel.sensors
-
-    # Asserting only a single JOIN query was executed
-    capquery.assert_executed_queries(
-        # language=SQL
-        """
-        SELECT
-            alarm_panels.id AS alarm_panels_id,
-            alarm_panels.mac_address AS alarm_panels_mac_address,
-            alarm_panels.is_online AS alarm_panels_is_online,
-            sensors_1.id AS sensors_1_id,
-            sensors_1.panel_id AS sensors_1_panel_id,
-            sensors_1.name AS sensors_1_name,
-            sensors_1.sensor_type AS sensors_1_sensor_type
-        FROM alarm_panels
-        LEFT OUTER JOIN sensors AS sensors_1 ON alarm_panels.id = sensors_1.panel_id
-        """
-    )
-```
+---
 
 ## Contributing
 
@@ -197,7 +107,7 @@ these steps:
    enhancement, or bug fix you have in mind.
 2. **Contribute the Code:** Once discussed, fork the repository, create your branch, make your
    changes, and submit a Pull Request.
-3. **Review & Release:** Felipe will review your PR. Once approved and merged, the release process
+3. **Review & Release:** All PRs will be reviewed. Once approved and merged, the release process
    will be managed by the maintainer.
 
 ### Developer Setup
@@ -212,7 +122,7 @@ cd pytest-capquery
 # Install Python, dependencies, and pre-commit hooks
 make setup
 
-# Run the full test suite (requires Docker for E2E multi-dialect tests)
+# Run the full test suite (handles DB spin-up and coverage)
 make test
 ```
 
@@ -221,4 +131,4 @@ make test
 This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0
 International (CC BY-NC-SA 4.0)**.
 
-Author: [Felipe Cardoso Martins](https://github.com/fmartins)
+Author: [Felipe Cardoso Martins](mailto:felipe.cardoso.martins@gmail.com)

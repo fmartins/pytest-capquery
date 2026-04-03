@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: setup setup-env install test test-unit test-e2e db-up db-down clean format check-format help
+.PHONY: setup setup-env install test db-up db-down clean format check-format help
 
 help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -25,13 +25,8 @@ db-up: ## Start Docker Compose databases
 db-down: ## Tear down Docker Compose databases
 	docker compose down -v
 
-test: test-unit test-e2e ## Run all tests
-
-test-unit: ## Run unit tests
-	./.venv/bin/pytest -vvv tests/unit/
-
-test-e2e: db-up ## Run E2E tests and strict dialect matrix
-	./.venv/bin/pytest -vvv tests/e2e/ || (make db-down && exit 1)
+test: db-up ## Run all tests with code coverage and test analytics
+	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/ || (make db-down && exit 1)
 	make db-down
 
 clean: ## Remove virtual environment and cached files

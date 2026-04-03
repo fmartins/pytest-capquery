@@ -1,6 +1,5 @@
 import pytest
 from sqlalchemy import text
-from pytest_capquery.plugin import capquery
 
 
 def test_single_query(capquery, sqlite_engine):

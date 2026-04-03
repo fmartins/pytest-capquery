@@ -135,59 +135,21 @@ class TxEvent:
         pass
 
 
-class CapQueryWrapper(CaptureSqlStatements):
+class QueryAsserter:
     """
-    A context manager and SQLAlchemy event listener for capturing executed queries.
-
-    This class runs at the boundary of SQLAlchemy engines, intercepting query
-    events in real time while pushing explicit transaction logs (BEGIN, COMMIT)
-    into a unified collection timeline.
-
-    It exposes rigorous assertion methods to ensure an explicit chronological
-    execution order, safeguarding ORMs against N+1 regression patterns and
-    excessive transaction footprints.
+    Base mixin providing assertion capabilities and formatting over a collection of SQL statements.
     """
-    _listeners: Dict[str, Callable[[Connection], None]]
-
-    def __enter__(self) -> "CapQueryWrapper":
-        """
-        Enters the context manager and registers transaction event listeners.
-
-        Returns:
-            CapQueryWrapper: The active wrapper capturing queries.
-        """
-        super().__enter__()
-
-        self._listeners = {
-            "begin": lambda conn: self.statements.append(TxEvent("BEGIN")),
-            "commit": lambda conn: self.statements.append(TxEvent("COMMIT")),
-            "rollback": lambda conn: self.statements.append(TxEvent("ROLLBACK")),
-        }
-        for name, fn in self._listeners.items():
-            event.listen(self.engine, name, fn)
-
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """
-        Exits the context manager and cleans up bound SQLAlchemy listeners.
-        """
-        for name, fn in self._listeners.items():
-            event.remove(self.engine, name, fn)
-        super().__exit__(exc_type, exc_val, exc_tb)
 
     def _normalize_statement(self, item: Any) -> CapturedStmt:
         """
         Internally coerces parsed statements into the CapturedStmt protocol.
 
         Args:
-            item (Any): Raw output appended to self.statements.
+            item (Any): Raw output appended to statements.
 
         Returns:
             CapturedStmt: The safely typed object with .statement and .parameters access.
         """
-        if isinstance(item, str):
-            return cast(CapturedStmt, NormalizedStringStmt(statement=item))
         return cast(CapturedStmt, item)
 
     @property
@@ -195,15 +157,11 @@ class CapQueryWrapper(CaptureSqlStatements):
         """
         Generates a copy-and-paste friendly string of all captured statements.
 
-        This output translates internal session state into structured triple-quoted
-        string assertions. When debugging test failures, developers can inject this
-        property's output into their test code to rebuild their strict chronology
-        expectations visually rather than doing it manually.
-
         Returns:
             str: A meticulously formatted history of recorded queries and events.
         """
         out = []
+        # Expects self.statements to be provided by the inheriting class
         for raw_stmt in self.statements:
             stmt = self._normalize_statement(raw_stmt)
             formatted = f'"""\n{reformat_query(stmt.statement)}\n"""'
@@ -229,14 +187,6 @@ class CapQueryWrapper(CaptureSqlStatements):
     ) -> None:
         """
         Asserts that captured statements match an expected chronological sequence.
-
-        This guarantees the absolute order, formatting, and parameter bound types
-        of every database command executed during the wrapped timeline.
-
-        Users can define individual `expected_queries` items using two strict shapes:
-        1. A raw `str` like `"BEGIN"` or an explicit pure query without parameters.
-        2. A `Tuple[str, Any]` to match a specific executable query against
-           a precise boundary of parameters.
 
         Args:
             *expected_queries (Union[str, Tuple[str, Any]]): Variable length positional
@@ -292,7 +242,6 @@ class CapQueryWrapper(CaptureSqlStatements):
                         f"{self.help}"
                     )
             else:
-                # Strictly enforce empty or None parameters for missing expectations
                 if actual_params:
                     raise AssertionError(
                         f"Mismatch at index {i}\n"
@@ -314,6 +263,107 @@ class CapQueryWrapper(CaptureSqlStatements):
             raise AssertionError(
                 f"Expected {expected_total_queries} queries, but found {len(self.statements)}.\n\n{self.help}"
             )
+
+
+class CaptureContext(QueryAsserter):
+    """
+    A context manager representing a localized slice of captured SQL queries.
+    """
+    def __init__(self, wrapper: "CapQueryWrapper", expected_count: Optional[int] = None) -> None:
+        """
+        Initializes a new capture context.
+
+        Args:
+            wrapper (CapQueryWrapper): The parent wrapper capturing global statements.
+            expected_count (Optional[int]): The strictly expected number of queries to assert on exit.
+        """
+        self._wrapper = wrapper
+        self._expected_count = expected_count
+        self._start_idx = 0
+        self._end_idx = 0
+        self._active = False
+
+    def __enter__(self) -> "CaptureContext":
+        """
+        Enters the context manager and anchors the starting index.
+
+        Returns:
+            CaptureContext: The active capture context.
+        """
+        self._start_idx = len(self._wrapper.statements)
+        self._active = True
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Exits the context manager, anchors the ending index, and asserts total queries if expected.
+        """
+        self._end_idx = len(self._wrapper.statements)
+        self._active = False
+        if exc_type is None and self._expected_count is not None:
+            self.assert_total_queries(self._expected_count)
+
+    @property
+    def statements(self) -> List[Any]:
+        """
+        Retrieves the slice of statements captured during the lifecycle of this context.
+
+        Returns:
+            List[Any]: The isolated segment of executed queries.
+        """
+        if self._active:
+            return self._wrapper.statements[self._start_idx:]
+        return self._wrapper.statements[self._start_idx:self._end_idx]
+
+
+class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
+    """
+    A context manager and SQLAlchemy event listener for capturing executed queries.
+
+    This class runs at the boundary of SQLAlchemy engines, intercepting query
+    events in real time while pushing explicit transaction logs (BEGIN, COMMIT)
+    into a unified collection timeline.
+    """
+    _listeners: Dict[str, Callable[[Connection], None]]
+
+    def __enter__(self) -> "CapQueryWrapper":
+        """
+        Enters the context manager and registers transaction event listeners.
+
+        Returns:
+            CapQueryWrapper: The active wrapper capturing queries.
+        """
+        super().__enter__()
+
+        self._listeners = {
+            "begin": lambda conn: self.statements.append(TxEvent("BEGIN")),
+            "commit": lambda conn: self.statements.append(TxEvent("COMMIT")),
+            "rollback": lambda conn: self.statements.append(TxEvent("ROLLBACK")),
+        }
+        for name, fn in self._listeners.items():
+            event.listen(self.engine, name, fn)
+
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Exits the context manager and cleans up bound SQLAlchemy listeners.
+        """
+        for name, fn in self._listeners.items():
+            event.remove(self.engine, name, fn)
+        super().__exit__(exc_type, exc_val, exc_tb)
+
+    def capture(self, expected_count: Optional[int] = None) -> CaptureContext:
+        """
+        Creates a localized capture context to isolate a specific timeline of queries.
+
+        Args:
+            expected_count (Optional[int]): The strictly expected number of queries executed inside the block.
+
+        Returns:
+            CaptureContext: A context manager exposing only the localized slice of the execution timeline.
+        """
+        return CaptureContext(self, expected_count)
 
 
 @pytest.fixture
