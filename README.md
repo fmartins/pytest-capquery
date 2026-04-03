@@ -1,6 +1,7 @@
 # pytest-capquery
 
 ![Build Status](https://github.com/fmartins/pytest-capquery/actions/workflows/ci.yml/badge.svg)
+[![Codecov](https://codecov.io/gh/fmartins/pytest-capquery/graph/badge.svg)](https://codecov.io/gh/fmartins/pytest-capquery)
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)
 

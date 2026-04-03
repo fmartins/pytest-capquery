@@ -26,8 +26,12 @@ jobs:
       - name: Check code formatting
         run: make check-format
 
-      - name: Run unit tests
-        run: make test-unit
+      - name: Run tests with coverage
+        run: make test-cov
 
-      - name: Run E2E tests and strict dialect matrix
-        run: make test-e2e
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
