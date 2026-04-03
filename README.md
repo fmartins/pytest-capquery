@@ -122,8 +122,8 @@ cd pytest-capquery
 # Install Python, dependencies, and pre-commit hooks
 make setup
 
-# Run the full test suite in parallel with code coverage
-make test-cov
+# Run the full test suite (handles DB spin-up and coverage)
+make test
 ```
 
 ## License

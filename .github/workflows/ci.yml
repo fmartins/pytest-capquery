@@ -27,7 +27,7 @@ jobs:
         run: make check-format
 
       - name: Run tests with coverage
-        run: make test-cov
+        run: make test
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
