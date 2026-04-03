@@ -32,10 +32,10 @@ test-cov: db-up ## Run all tests with code coverage
 	make db-down
 
 test-unit: ## Run unit tests
-	./.venv/bin/pytest -vvv tests/unit/
+	./.venv/bin/pytest -p no:capquery -vvv tests/unit/
 
 test-e2e: db-up ## Run E2E tests and strict dialect matrix
-	./.venv/bin/pytest -vvv tests/e2e/ || (make db-down && exit 1)
+	./.venv/bin/pytest -p no:capquery -vvv tests/e2e/ || (make db-down && exit 1)
 	make db-down
 
 clean: ## Remove virtual environment and cached files
