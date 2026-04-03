@@ -22,6 +22,7 @@ capquery = "pytest_capquery.plugin"
 test = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "sqlalchemy-capture-sql",
     "sqlparse",
     "psycopg2-binary",
