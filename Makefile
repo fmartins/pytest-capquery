@@ -28,7 +28,7 @@ db-down: ## Tear down Docker Compose databases
 test: test-unit test-e2e ## Run all tests
 
 test-cov: db-up ## Run all tests with code coverage
-	./.venv/bin/pytest -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml tests/unit/ tests/e2e/ || (make db-down && exit 1)
+	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml tests/unit/ tests/e2e/ || (make db-down && exit 1)
 	make db-down
 
 test-unit: ## Run unit tests

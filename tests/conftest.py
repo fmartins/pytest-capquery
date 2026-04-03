@@ -1,4 +1,7 @@
 import pytest
+
+pytest_plugins = ["pytest_capquery.plugin"]
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy.pool import StaticPool
