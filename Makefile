@@ -25,8 +25,8 @@ db-up: ## Start Docker Compose databases
 db-down: ## Tear down Docker Compose databases
 	docker compose down -v
 
-test: db-up ## Run all tests (unit and E2E) with code coverage
-	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml tests/ || (make db-down && exit 1)
+test: db-up ## Run all tests with code coverage and test analytics
+	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/ || (make db-down && exit 1)
 	make db-down
 
 clean: ## Remove virtual environment and cached files
