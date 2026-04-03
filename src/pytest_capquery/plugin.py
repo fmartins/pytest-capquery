@@ -150,8 +150,6 @@ class QueryAsserter:
         Returns:
             CapturedStmt: The safely typed object with .statement and .parameters access.
         """
-        if isinstance(item, str):
-            return cast(CapturedStmt, NormalizedStringStmt(statement=item))
         return cast(CapturedStmt, item)
 
     @property
