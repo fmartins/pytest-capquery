@@ -62,3 +62,21 @@ def test_assertion_error_unexpected_parameters(capquery, sqlite_engine):
 
     error_msg = str(exc_info.value)
     assert "Expected Params to be empty or None, but got:" in error_msg
+
+
+def test_assertion_error_missing_executed_query(capquery, sqlite_engine):
+    with sqlite_engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+
+    with pytest.raises(AssertionError) as exc_info:
+        capquery.assert_executed_queries(
+            "BEGIN",
+            "SELECT 1",
+            "ROLLBACK",
+            "SELECT 2",
+            strict=False
+        )
+
+    error_msg = str(exc_info.value)
+    assert "Mismatch at index 3" in error_msg
+    assert "Expected query or event but no more statements were recorded" in error_msg
