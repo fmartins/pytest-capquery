@@ -7,12 +7,15 @@ All open connections and pools are explicitly invalidated during teardown to mai
 environment integrity and suppress system resource warnings.
 """
 
+from pathlib import Path
 from typing import Generator
+
 import pytest
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from pytest_capquery.plugin import CapQueryWrapper
+from pytest_capquery.snapshot import SnapshotManager
 from tests.models import Base
 
 
@@ -97,8 +100,6 @@ def mysql_session(mysql_engine: Engine) -> Generator[Session, None, None]:
     session.close()
 
 
-from pathlib import Path
-from pytest_capquery.snapshot import SnapshotManager
 
 @pytest.fixture(scope="function")
 def postgres_capquery(request: pytest.FixtureRequest, postgres_engine: Engine) -> Generator[CapQueryWrapper, None, None]:
