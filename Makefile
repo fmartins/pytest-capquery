@@ -30,7 +30,7 @@ test: db-up ## Run all tests with code coverage and test analytics
 	make db-down
 
 tdd: db-up ## Run tests in watch mode for test-driven development
-	./.venv/bin/ptw src/ tests/ --now --runner ./.venv/bin/pytest -vvv -p no:capquery --capquery-update || (make db-down && exit 1)
+	./.venv/bin/ptw . --now --runner ./.venv/bin/pytest tests/ -vvv -p no:capquery --capquery-update || (make db-down && exit 1)
 	make db-down
 
 clean: ## Remove virtual environment and cached files
