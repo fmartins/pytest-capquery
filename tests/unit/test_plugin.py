@@ -1,144 +1,130 @@
-"""Validation of the primary Pytest CapQuery plugin interface mechanisms.
+"""Validation of the Snapshot capture generation and assertion capabilities.
 
-This module guarantees that the context encapsulation layer works reliably to isolate tracked
-database events securely without leaking transactional scope parameters globally.
+This module guarantees comprehensive testing of the physical disk verification paths, confirming
+automated query comparison handles updating sequences securely while failing dynamically when
+runtime timeline representations drift from established persistence logic.
 """
 
-from unittest.mock import MagicMock
-
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
-from pytest_capquery.models import TxEvent
 from pytest_capquery.plugin import CapQueryWrapper
+from pytest_capquery.snapshot import SnapshotManager
+from tests.models import AlarmPanel, Sensor
 
 
-def test_capture_block_isolation(sqlite_engine, capquery):
-    """Ensures that queries executed outside the specific capture context block are not visible
-    inside its internal ledger, but the parent global wrapper maintains omnipresent scope
-    tracking."""
-    with sqlite_engine.begin() as conn:
-        conn.execute(text("SELECT 1"))
+def test_user_business_logic(sqlite_session, capquery):
+    """Simulates a standard practical snapshot generation sequence, verifying the plugin captures
+    local nested blocks directly resolving them appropriately against implicit automated file
+    allocations automatically tied to the host test invocation."""
+    panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
+    sqlite_session.add(panel)
+    sqlite_session.flush()
 
-        with capquery.capture() as phase:
-            conn.execute(text("SELECT 2"))
-            conn.execute(text("SELECT 3"))
+    with capquery.capture(assert_snapshot=True):
+        sensor = Sensor(name="Front Door", sensor_type="Contact")
+        panel.sensors.append(sensor)
+        sqlite_session.flush()
 
-        conn.execute(text("SELECT 4"))
-
-    phase.assert_executed_queries("SELECT 2", "SELECT 3", strict=True)
-
-    capquery.assert_executed_queries(
-        "BEGIN", "SELECT 1", "SELECT 2", "SELECT 3", "SELECT 4", "COMMIT", strict=True
-    )
+    sqlite_session.rollback()
 
 
-def test_multiple_sequential_captures(sqlite_engine, capquery):
-    """Verifies that declaring sequence-based parallel capture boundaries safely establishes strict
-    chronological segmentation logic across all involved instances reliably."""
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as phase_one:
-            conn.execute(text("SELECT 'A'"))
+def test_user_multiple_phases(sqlite_session, capquery):
+    """Confirms multiple capture phases inside single transaction tests write and check their
+    relative sequential markers distinctly within the overarching module scope.
 
-        with capquery.capture() as phase_two:
-            conn.execute(text("SELECT 'B'"))
-            conn.execute(text("SELECT 'C'"))
+    Ensures safe serialization of all phases into a single cohesive snapshot block.
+    """
+    panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=True)
 
-    phase_one.assert_executed_queries("SELECT 'A'")
-    phase_two.assert_executed_queries("SELECT 'B'", "SELECT 'C'")
+    with capquery.capture(assert_snapshot=True, alias="Panel Setup Phase"):
+        sqlite_session.add(panel)
+        sqlite_session.flush()
 
-    capquery.assert_executed_queries("BEGIN", "SELECT 'A'", "SELECT 'B'", "SELECT 'C'", "COMMIT")
+    with capquery.capture(assert_snapshot=True):
+        sensor_1 = Sensor(name="Living Room", sensor_type="Motion")
+        sensor_2 = Sensor(name="Back Door", sensor_type="Contact")
+        panel.sensors.extend([sensor_1, sensor_2])
+        sqlite_session.flush()
 
+    with capquery.capture(assert_snapshot=True, alias="Status Toggle and Deletion Phase"):
+        panel.is_online = False
+        panel.sensors.remove(sensor_1)
+        sqlite_session.flush()
 
-def test_capture_expected_count_success(sqlite_engine, capquery):
-    """Validates that the expected statement quantity constraints silently yield correctly when
-    boundary lengths align structurally to the strict metric assigned directly."""
-    with sqlite_engine.begin() as conn:
-        with capquery.capture(expected_count=2):
-            conn.execute(text("SELECT 1"))
-            conn.execute(text("SELECT 2"))
-
-
-def test_capture_expected_count_failure(sqlite_engine, capquery):
-    """Establishes that exceeding execution limits promptly evaluates the block termination logic
-    yielding critical validation exception sequences dynamically notifying the layer."""
-    with sqlite_engine.begin() as conn:
-        with pytest.raises(AssertionError, match="Expected 1 queries, but found 2"):
-            with capquery.capture(expected_count=1):
-                conn.execute(text("SELECT 1"))
-                conn.execute(text("SELECT 2"))
+    sqlite_session.rollback()
 
 
-def test_capture_expected_count_bypassed_on_exception(sqlite_engine, capquery):
-    """Protects user experience ensuring unexpected business logic framework crashes bypass the
-    secondary assertions internally preserving parent traceability stack tracks natively."""
+def test_internal_catching_a_sql_regression(sqlite_engine, sqlite_session, tmp_path):
+    """Guarantees logical code drifts trigger accurate output diff comparisons against the explicit
+    physical entries ensuring regressions are visibly surfaced quickly."""
+    test_file = tmp_path / "test_regression.py"
 
-    class BusinessLogicError(Exception):
-        pass
+    sm_update = SnapshotManager(nodeid="test_regression", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update) as wrapper_update:
+        with wrapper_update.capture() as phase:
+            sqlite_session.execute(text("SELECT 1"))
+        phase.assert_matches_snapshot()
 
-    with pytest.raises(BusinessLogicError):
-        with sqlite_engine.begin() as conn:
-            with capquery.capture(expected_count=2):
-                conn.execute(text("SELECT 1"))
-                raise BusinessLogicError("Something went wrong in the app")
+    sqlite_session.rollback()
 
+    sm_read = SnapshotManager(nodeid="test_regression", test_path=test_file, update_mode=False)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_read) as wrapper_read:
+        with wrapper_read.capture() as regression_phase:
+            sqlite_session.execute(text("SELECT 2"))
 
-def test_capture_active_state_assertions(sqlite_engine, capquery):
-    """Asserts validation handlers successfully maintain execution verification capabilities while
-    running functionally mid-transaction continuously across the scope stack directly."""
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as active_phase:
-            conn.execute(text("SELECT 1"))
+        with pytest.raises(AssertionError) as exc_info:
+            regression_phase.assert_matches_snapshot()
 
-            active_phase.assert_executed_queries("SELECT 1")
+    sqlite_session.rollback()
 
-            conn.execute(text("SELECT 2"))
-
-            active_phase.assert_executed_queries("SELECT 1", "SELECT 2")
-
-
-def test_wrapper_exit_closes_resources():
-    engine = create_engine("sqlite:///:memory:")
-    wrapper = CapQueryWrapper(engine)
-    wrapper.__enter__()
-    mock_cur = MagicMock()
-    mock_conn = MagicMock()
-    wrapper._cur = mock_cur
-    wrapper.connection = mock_conn
-
-    wrapper.__exit__(None, None, None)
-
-    mock_cur.close.assert_called_once()
-    mock_conn.close.assert_called_once()
-
-    wrapper2 = CapQueryWrapper(engine)
-    wrapper2.__enter__()
-    mock_cur_exception = MagicMock()
-    mock_cur_exception.close.side_effect = Exception()
-    mock_conn_exception = MagicMock()
-    mock_conn_exception.close.side_effect = Exception()
-
-    wrapper2._cur = mock_cur_exception
-    wrapper2.connection = mock_conn_exception
-    wrapper2.__exit__(None, None, None)
+    error_msg = str(exc_info.value)
+    assert "Mismatch at index 1" in error_msg
+    assert "Expected SQL:\nSELECT 1" in error_msg
+    assert "Actual SQL:\nSELECT 2" in error_msg
 
 
-def test_serialize_snapshot_ignores_empty_query():
-    engine = create_engine("sqlite:///:memory:")
-    wrapper = CapQueryWrapper(engine)
-    wrapper.statements.append(TxEvent(statement=""))
-    wrapper.phases.append({"alias": None, "statements": wrapper.statements})
+def test_internal_missing_snapshot_file(sqlite_engine, sqlite_session, tmp_path):
+    """Proves missing physical representations gracefully surface explicit developer instructions
+    guiding them toward generation commands rather than simply failing."""
+    test_file = tmp_path / "test_missing.py"
 
-    result = wrapper._serialize_snapshot()
+    sm_read = SnapshotManager(nodeid="test_missing", test_path=test_file, update_mode=False)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_read) as wrapper_read:
+        with wrapper_read.capture() as phase:
+            sqlite_session.execute(text("SELECT 1"))
 
-    assert result == "\n"
+        with pytest.raises(AssertionError) as exc_info:
+            phase.assert_matches_snapshot()
+
+    sqlite_session.rollback()
+
+    error_msg = str(exc_info.value)
+    assert "No snapshot found for this test." in error_msg
+    assert "Run pytest with `--capquery-update` to generate it" in error_msg
 
 
-def test_deserialize_snapshot_ignores_empty_query():
-    engine = create_engine("sqlite:///:memory:")
-    wrapper = CapQueryWrapper(engine)
-    content = "-- CAPQUERY: Query 1\n-- EXPECTED_PARAMS: None\n-- PHASE: 1\n"
+def test_internal_snapshot_file_overwritten_in_update_mode(sqlite_engine, sqlite_session, tmp_path):
+    """Confirms the pipeline operating in explicit update mode completely replaces stale physical
+    markers instead of redundantly appending overlapping execution logic."""
+    test_file = tmp_path / "test_overwrite.py"
 
-    result = wrapper._deserialize_snapshot(content)
+    sm_update1 = SnapshotManager(nodeid="test_overwrite", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update1) as wrapper_update1:
+        with wrapper_update1.capture() as phase1:
+            sqlite_session.execute(text("SELECT 'OLD'"))
+        phase1.assert_matches_snapshot()
 
-    assert result == []
+    sqlite_session.rollback()
+
+    sm_update2 = SnapshotManager(nodeid="test_overwrite", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update2) as wrapper_update2:
+        with wrapper_update2.capture() as phase2:
+            sqlite_session.execute(text("SELECT 'NEW'"))
+        phase2.assert_matches_snapshot()
+
+    sqlite_session.rollback()
+
+    content = sm_update2.snapshot_file.read_text()
+    assert "SELECT 'NEW'" in content
+    assert "SELECT 'OLD'" not in content
