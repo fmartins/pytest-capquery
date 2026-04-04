@@ -9,6 +9,8 @@ between execution logs over to assertions models natively surfacing the capquery
 
 import ast
 import datetime
+import decimal
+import uuid
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -172,8 +174,12 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             eval_globals = {
                 "__builtins__": None,
                 "datetime": datetime.datetime,
+                "date": datetime.date,
+                "time": datetime.time,
+                "timedelta": datetime.timedelta,
                 "FakeDatetime": datetime.datetime,
-                "Decimal": None,
+                "Decimal": decimal.Decimal,
+                "UUID": uuid.UUID,
             }
             params = eval(params_str, eval_globals)
             item = query_str if params is None else (query_str, params)
