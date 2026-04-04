@@ -172,7 +172,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
 
             eval_globals = {
                 "__builtins__": None,
-                "datetime": datetime.datetime,
+                "datetime": datetime,
                 "date": datetime.date,
                 "time": datetime.time,
                 "timedelta": datetime.timedelta,
