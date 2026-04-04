@@ -11,6 +11,8 @@ preventing N+1 query issues and ensuring precise transaction boundaries.
 """
 
 import functools
+import sys
+import textwrap
 from dataclasses import dataclass
 from typing import Any, Sequence, Tuple, Union, Optional, Dict, Callable, List, cast, Protocol, runtime_checkable
 
@@ -153,6 +155,43 @@ class QueryAsserter:
         return cast(CapturedStmt, item)
 
     @property
+    def copy_paste_block(self) -> str:
+        lines = []
+        for raw_stmt in self.statements:
+            stmt = self._normalize_statement(raw_stmt)
+            q_str = reformat_query(stmt.statement)
+
+            if not q_str:
+                continue
+
+            if "\n" not in q_str and len(q_str) < 30 and stmt.parameters is None:
+                lines.append(f'    "{q_str}"')
+                continue
+
+            indented_sql = textwrap.indent(q_str, "        ")
+
+            if stmt.parameters is not None:
+                lines.append(
+                    "    (\n"
+                    "        # language=SQL\n"
+                    '        """\n'
+                    f"{indented_sql}\n"
+                    '        """,\n'
+                    f"        {repr(stmt.parameters)}\n"
+                    "    )"
+                )
+            else:
+                lines.append(
+                    "    # language=SQL\n"
+                    '    """\n'
+                    f"{indented_sql}\n"
+                    '    """'
+                )
+
+        joined_blocks = ",\n".join(lines)
+        return f"assert_executed_queries(\n{joined_blocks}\n)"
+
+    @property
     def queries_history(self) -> str:
         """
         Generates a copy-and-paste friendly string of all captured statements.
@@ -161,7 +200,6 @@ class QueryAsserter:
             str: A meticulously formatted history of recorded queries and events.
         """
         out = []
-        # Expects self.statements to be provided by the inheriting class
         for raw_stmt in self.statements:
             stmt = self._normalize_statement(raw_stmt)
             formatted = f'"""\n{reformat_query(stmt.statement)}\n"""'
@@ -179,6 +217,19 @@ class QueryAsserter:
             str: Debugging output showing all statements recorded by this wrapper.
         """
         return f"Captured queries:\n{self.queries_history}"
+
+    def _fail_with_instructions(self, error_msg: str) -> None:
+        divider = "=" * 80
+        out = (
+            f"\n{divider}\n"
+            f"🚨 CAPQUERY: COPY & PASTE TO FIX ASSERTION 🚨\n"
+            f"{divider}\n\n"
+            f"{self.copy_paste_block}\n\n"
+            f"{divider}\n"
+        )
+        sys.stdout.write(out)
+        sys.stdout.flush()
+        raise AssertionError(f"{error_msg}\n\n(See 'Captured stdout call' above for the copy-paste block)")
 
     def assert_executed_queries(
         self,
@@ -204,7 +255,7 @@ class QueryAsserter:
 
         for i, expected in enumerate(expected_queries):
             if i >= len(self.statements):
-                raise AssertionError(
+                self._fail_with_instructions(
                     f"Mismatch at index {i}\n"
                     f"Expected query or event but no more statements were recorded.\n\n"
                     f"{self.help}"
@@ -223,7 +274,7 @@ class QueryAsserter:
             actual_formatted = reformat_query(actual_q_str)
 
             if expected_formatted != actual_formatted:
-                raise AssertionError(
+                self._fail_with_instructions(
                     f"Mismatch at index {i}\n"
                     f"Expected SQL:\n{expected_formatted}\n\n"
                     f"Actual SQL:\n{actual_formatted}\n\n"
@@ -234,7 +285,7 @@ class QueryAsserter:
                 norm_expected = _normalize_params(expected_params)
                 norm_actual = _normalize_params(actual_params)
                 if norm_expected != norm_actual:
-                    raise AssertionError(
+                    self._fail_with_instructions(
                         f"Mismatch at index {i}\n"
                         f"Expected Params:\n{expected_params}\n\n"
                         f"Actual Params:\n{actual_params}\n\n"
@@ -243,7 +294,7 @@ class QueryAsserter:
                     )
             else:
                 if actual_params:
-                    raise AssertionError(
+                    self._fail_with_instructions(
                         f"Mismatch at index {i}\n"
                         f"Expected Params to be empty or None, but got:\n{actual_params}\n\n"
                         f"{self.help}"
@@ -260,7 +311,7 @@ class QueryAsserter:
             AssertionError: If actual executed interactions deviate from expectations.
         """
         if len(self.statements) != expected_total_queries:
-            raise AssertionError(
+            self._fail_with_instructions(
                 f"Expected {expected_total_queries} queries, but found {len(self.statements)}.\n\n{self.help}"
             )
 

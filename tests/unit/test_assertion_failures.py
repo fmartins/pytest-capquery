@@ -80,3 +80,45 @@ def test_assertion_error_missing_executed_query(capquery, sqlite_engine):
     error_msg = str(exc_info.value)
     assert "Mismatch at index 3" in error_msg
     assert "Expected query or event but no more statements were recorded" in error_msg
+
+
+def test_assertion_error_generates_stdout_copy_paste_block(capquery, sqlite_engine, capsys):
+    """
+    Validates that a failed assertion outputs the perfectly formatted
+    Python block to sys.stdout for easy copy-pasting.
+    """
+    with sqlite_engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+
+    with pytest.raises(AssertionError):
+        capquery.assert_executed_queries(
+            "BEGIN",
+            "SELECT 2",
+            "ROLLBACK"
+        )
+
+    captured = capsys.readouterr()
+    stdout = captured.out
+
+    expected_stdout = (
+        "\n"
+        "================================================================================\n"
+        "🚨 CAPQUERY: COPY & PASTE TO FIX ASSERTION 🚨\n"
+        "================================================================================\n"
+        "\n"
+        "assert_executed_queries(\n"
+        '    "BEGIN",\n'
+        "    (\n"
+        "        # language=SQL\n"
+        '        """\n'
+        "        SELECT 1\n"
+        '        """,\n'
+        "        ()\n"
+        "    ),\n"
+        '    "ROLLBACK"\n'
+        ")\n"
+        "\n"
+        "================================================================================\n"
+    )
+
+    assert stdout == expected_stdout
