@@ -6,7 +6,6 @@ constructed and torn down properly to prevent resource leakage.
 """
 
 import gc
-from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -67,16 +66,12 @@ def sqlite_session(sqlite_engine: Engine) -> Generator[Session, None, None]:
 
 @pytest.fixture(scope="function")
 def sqlite_capquery(
-    request: pytest.FixtureRequest, sqlite_engine: Engine
+    sqlite_engine: Engine, capquery_context: SnapshotManager
 ) -> Generator[CapQueryWrapper, None, None]:
     """Function-scoped fixture providing a CapQuery wrapper bound to the SQLite engine.
 
     Automatically intercepts and captures SQL statements and transaction events dispatched from the
-    provided SQLite engine context.
+    provided SQLite engine context, leveraging the globally provided snapshot context.
     """
-    update_mode = request.config.getoption("--capquery-update", default=False)
-    snapshot_manager = SnapshotManager(
-        nodeid=request.node.nodeid, test_path=Path(request.node.path), update_mode=update_mode
-    )
-    with CapQueryWrapper(sqlite_engine, snapshot_manager=snapshot_manager) as captured:
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=capquery_context) as captured:
         yield captured

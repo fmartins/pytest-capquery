@@ -6,7 +6,6 @@ explicitly invalidated during teardown to maintain environment integrity and sup
 resource warnings.
 """
 
-from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -55,15 +54,12 @@ def postgres_session(postgres_engine: Engine) -> Generator[Session, None, None]:
 
 @pytest.fixture(scope="function")
 def postgres_capquery(
-    request: pytest.FixtureRequest, postgres_engine: Engine
+    postgres_engine: Engine, capquery_context: SnapshotManager
 ) -> Generator[CapQueryWrapper, None, None]:
     """Provide an engine-bound CapQuery interception interface for PostgreSQL.
 
-    Catches and tracks psycopg2 Dialect queries executed through the provisioned engine.
+    Catches and tracks psycopg2 Dialect queries executed through the provisioned engine, leveraging
+    the globally provided snapshot context.
     """
-    update_mode = request.config.getoption("--capquery-update", default=False)
-    snapshot_manager = SnapshotManager(
-        nodeid=request.node.nodeid, test_path=Path(request.node.path), update_mode=update_mode
-    )
-    with CapQueryWrapper(postgres_engine, snapshot_manager=snapshot_manager) as captured:
+    with CapQueryWrapper(postgres_engine, snapshot_manager=capquery_context) as captured:
         yield captured
