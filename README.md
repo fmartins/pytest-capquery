@@ -5,33 +5,36 @@
 ![Python Version](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)
 
-Testing your business logic is good, but **testing your database interactions is critical**.
+Testing your business logic is good, but **documenting and testing your database interactions is
+critical**.
 
-`pytest-capquery` treats your SQL queries as first-class citizens in your test suite. By asserting
-the exact queries executed, you create living documentation of what is truly happening behind the
-scenes. This guarantees deterministic performance, catches N+1 regressions instantly, and ensures
-your application behaves exactly as intended.
+`pytest-capquery` treats your SQL queries as first-class citizens in your Pytest suite. By capturing
+and asserting the exact queries executed, you create a living documentation of what is truly
+happening behind the ORM abstraction.
 
-Designed for modern Python applications, `pytest-capquery` is a strict, strongly-typed SQLAlchemy
-pytest plugin that enforces exact chronological query execution, validating precise SQL strings,
-parameter bindings, and transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`).
+This plugin does not force any specific SQLAlchemy architectural changes or optimization strategies.
+It delegates all design decisions to the developer, acting strictly as a deterministic guardrail.
+Once you've optimized your query footprint, `pytest-capquery` locks it in, ensuring cross-dialect
+equality, validating exact transaction boundaries (`BEGIN`, `COMMIT`, `ROLLBACK`), and catching
+silent N+1 regressions the second they are introduced.
 
 ## Key Features
 
 - **Contextual Isolation:** Use the `capture()` context manager to track queries locally without
   global state leakage or manual resets.
+- **SQL Snapshots:** Automatically generate and track expected `.sql` snapshots to easily document
+  executed queries without cluttering test files.
 - **Strict Timeline Assertion:** Validate the exact chronological sequence of SQL strings and
   transaction events.
-- **Heuristic N+1 Guards:** Use "loose assertion" mode to enforce maximum query counts without
-  binding tests to fragile ORM implementation details.
-- **Deterministic Parameter Matching:** Ensures cross-dialect equality for parameter structures.
-- **Async Ready:** Seamlessly integrates with standard and `AsyncSession` environments.
+- **Auto-Generating Assertions:** When explicit assertions fail, the plugin drops a fully formatted,
+  copy-paste-ready Python block into stdout.
+- **Heuristic Guards:** Use "loose assertion" mode to enforce maximum query counts.
 
 ## Used By
 
 `pytest-capquery` is actively used to protect the database performance of:
 
-- [macafe CLOUD](https://macafe.cloud/)
+- [macafe.cloud](https://macafe.cloud/)
 
 ---
 
@@ -48,25 +51,35 @@ pip install pytest-capquery
 The `capquery` fixture captures all SQLAlchemy statements executed by your code. The best practice
 is to use the `capture()` context manager to isolate specific execution phases.
 
-### 1. Preventing N+1 Queries (Loose Assertion)
+### 1. Documenting with SQL Snapshots (Recommended)
 
-If you want to protect a block of code against N+1 regressions without hardcoding exact SQL strings,
-you can enforce a strict expected query count at the context boundary:
+The most efficient way to document and protect your queries is by utilizing physical snapshots. This
+automatically compares execution behavior against tracked `.sql` files stored in a
+`__capquery_snapshots__` directory.
 
 ```python
-def test_fetch_users(sqlite_session, capquery):
-    # Enforce that exactly 1 query is executed inside this block.
-    # If a lazy-loading loop triggers extra queries, this will raise an AssertionError.
-    with capquery.capture(expected_count=1):
-        users = sqlite_session.query(User).all()
-        for user in users:
-            _ = user.address
+def test_update_user_status(sqlite_session, capquery):
+    # Enable assert_snapshot to verify execution against the disk
+    with capquery.capture(assert_snapshot=True):
+        user = sqlite_session.query(User).filter_by(id=1).first()
+        user.status = "active"
+        sqlite_session.commit()
 ```
 
-### 2. Asserting Exact SQL Execution (Strict Assertion)
+**Workflow:** When writing a new test or updating existing query logic, run Pytest with the update
+flag to automatically generate or overwrite the snapshot files:
 
-For mission-critical operations, you can capture a phase and rigorously assert the exact SQL and
-parameters executed:
+```bash
+pytest --capquery-update
+```
+
+Future runs without the flag will strictly assert that the runtime queries perfectly match the
+generated `.sql` file.
+
+### 2. Manual Explicit Assertions (Verbose)
+
+If you prefer to explicitly document the executed SQL directly inside your test cases, you can use
+strict manual assertions.
 
 ```python
 def test_update_user_status(sqlite_session, capquery):
@@ -96,6 +109,26 @@ def test_update_user_status(sqlite_session, capquery):
     )
 ```
 
+**Auto-Generation on Failure:** Maintaining long SQL strings can be tedious. If your code changes
+and the assertion fails, `pytest-capquery` will intercept the failure and drop the _correct_ Python
+assertion block directly into your terminal's stdout. Simply copy and paste the block from your
+terminal directly into your test to instantly fix the regression!
+
+### 3. Preventing N+1 Queries (Loose Assertion)
+
+If you want to protect a block of code against N+1 regressions without hardcoding exact SQL strings,
+you can enforce a strict expected query count at the context boundary:
+
+```python
+def test_fetch_users(sqlite_session, capquery):
+    # Enforce that exactly 1 query is executed inside this block.
+    # If a lazy-loading loop triggers extra queries, this will raise an AssertionError.
+    with capquery.capture(expected_count=1):
+        users = sqlite_session.query(User).all()
+        for user in users:
+            _ = user.address
+```
+
 ---
 
 ## Contributing
@@ -112,7 +145,8 @@ these steps:
 
 ### Developer Setup
 
-To get your local environment ready for contribution, run the following commands:
+To get your local environment ready for contribution, run the following commands. We prioritize a
+Test-Driven Development (TDD) workflow to continuously monitor database interactions.
 
 ```bash
 # Clone the repository
@@ -122,8 +156,30 @@ cd pytest-capquery
 # Install Python, dependencies, and pre-commit hooks
 make setup
 
-# Run the full test suite (handles DB spin-up and coverage)
-make test
+# Start the TDD watcher (auto-runs tests and updates snapshots on file changes)
+make tdd
+```
+
+### Makefile Reference
+
+```bash
+make help
+
+Usage:
+  make <target>
+
+Targets:
+  help                 Show this help message
+  setup                Full local setup: install pyenv python, create venv, and install deps
+  setup-env            Install local python version via pyenv (macOS/Linux dev only)
+  install              Create venv and install dependencies
+  db-up                Start Docker Compose databases
+  db-down              Tear down Docker Compose databases
+  test                 Run all tests with code coverage and test analytics
+  tdd                  Run tests in watch mode for test-driven development
+  clean                Remove virtual environment and cached files
+  format               Run formatters for python, markdown, yaml, and json files
+  check-format         Check if files comply with formatting rules (for CI)
 ```
 
 ## License
