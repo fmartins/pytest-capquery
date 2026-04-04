@@ -1,8 +1,21 @@
+"""
+Explicit parameterization validation tests for the SQLite dialect.
+
+This module validates that the assert_executed_queries functionality correctly
+matches specific, static SQL strings and their corresponding parameters within
+an SQLite context, ensuring accurate transaction event interception.
+"""
 from sqlalchemy.orm import joinedload
 
 from tests.models import AlarmPanel, Sensor
 
+
 def test_insert_and_select_normalization(sqlite_session, sqlite_capquery):
+    """
+    Validate that SQLite insert and complex joined-load select operations
+    are intercepted and accurately matched against explicitly hardcoded query
+    and parameter tuples.
+    """
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor = Sensor(name="Front Door", sensor_type="Contact")
     panel.sensors.append(sensor)
@@ -16,7 +29,6 @@ def test_insert_and_select_normalization(sqlite_session, sqlite_capquery):
     sqlite_capquery.assert_executed_queries(
         "BEGIN",
         (
-            # language=SQL
             """
             INSERT INTO alarm_panels (mac_address, is_online)
             VALUES (?, ?)
@@ -24,7 +36,6 @@ def test_insert_and_select_normalization(sqlite_session, sqlite_capquery):
             ("00:11:22:33:44:55", True)
         ),
         (
-            # language=SQL
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (?, ?, ?)
@@ -32,7 +43,6 @@ def test_insert_and_select_normalization(sqlite_session, sqlite_capquery):
             (1, "Front Door", "Contact")
         ),
         (
-            # language=SQL
             """
             SELECT
                 anon_1.alarm_panels_id AS anon_1_alarm_panels_id,

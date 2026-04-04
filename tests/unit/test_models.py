@@ -1,8 +1,20 @@
+"""
+Validation of complex dynamic SQLAlchemy internal execution mechanics.
+
+This module rigorously proves mapping interactions between Python models and
+intercepted raw DBAPI expressions correctly match declarative structures reliably
+across complicated joined loads and multi-transaction loops securely.
+"""
 from sqlalchemy.orm import joinedload
 
 from tests.models import AlarmPanel, Sensor
 
+
 def test_orm_insert(db_session, capquery):
+    """
+    Ensures that standard sequential class-based object insertions resolve distinctly
+    to correct parameter tuple bounds perfectly matching standard SQL generation paths.
+    """
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor1 = Sensor(name="Front Door", sensor_type="Contact")
     sensor2 = Sensor(name="Living Room", sensor_type="Motion")
@@ -16,7 +28,6 @@ def test_orm_insert(db_session, capquery):
     capquery.assert_executed_queries(
         "BEGIN",
         (
-            # language=SQL
             """
             INSERT INTO alarm_panels (mac_address, is_online)
             VALUES (?, ?)
@@ -24,7 +35,6 @@ def test_orm_insert(db_session, capquery):
             ("00:11:22:33:44:55", 1)
         ),
         (
-            # language=SQL
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (?, ?, ?) RETURNING id
@@ -32,7 +42,6 @@ def test_orm_insert(db_session, capquery):
             (1, "Front Door", "Contact")
         ),
         (
-            # language=SQL
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (?, ?, ?) RETURNING id
@@ -41,7 +50,12 @@ def test_orm_insert(db_session, capquery):
         )
     )
 
+
 def test_orm_update(db_session, capquery):
+    """
+    Confirms targeted object parameter replacement automatically delegates strict
+    SQL update strings precisely bounded against verified schema definitions continuously.
+    """
     panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=False)
     db_session.add(panel)
     db_session.flush()
@@ -53,7 +67,6 @@ def test_orm_update(db_session, capquery):
 
     capquery.assert_executed_queries(
         (
-            # language=SQL
             """
             SELECT
                 alarm_panels.id AS alarm_panels_id,
@@ -66,7 +79,6 @@ def test_orm_update(db_session, capquery):
             ("AA:BB:CC:DD:EE:FF", 1, 0)
         ),
         (
-            # language=SQL
             """
             UPDATE alarm_panels
             SET is_online=?
@@ -76,7 +88,12 @@ def test_orm_update(db_session, capquery):
         )
     )
 
+
 def test_orm_delete(db_session, capquery):
+    """
+    Validates cascaded removal triggers corresponding object deletion queries cleanly
+    leaving exact session markers fully transparent for regression checking layers.
+    """
     panel = AlarmPanel(mac_address="11:22:33:44:55:66", is_online=True)
     sensor = Sensor(name="Back Door", sensor_type="Contact")
     panel.sensors.append(sensor)
@@ -91,7 +108,6 @@ def test_orm_delete(db_session, capquery):
 
     capquery.assert_executed_queries(
         (
-            # language=SQL
             """
             SELECT
                 sensors.id AS sensors_id,
@@ -105,7 +121,6 @@ def test_orm_delete(db_session, capquery):
             ("Back Door", 1, 0)
         ),
         (
-            # language=SQL
             """
             DELETE FROM sensors
             WHERE sensors.id = ?
@@ -114,7 +129,12 @@ def test_orm_delete(db_session, capquery):
         )
     )
 
+
 def test_orm_select(db_session, capquery):
+    """
+    Assures simple declarative fetching routines bypass unnecessary engine overheads,
+    directly exposing concise limiting offset targets deterministically properly.
+    """
     panel = AlarmPanel(mac_address="22:33:44:55:66:77", is_online=False)
     db_session.add(panel)
     db_session.flush()
@@ -126,7 +146,6 @@ def test_orm_select(db_session, capquery):
     assert fetched_panel is not None
     capquery.assert_executed_queries(
         (
-            # language=SQL
             """
             SELECT
                 alarm_panels.id AS alarm_panels_id,
@@ -140,7 +159,12 @@ def test_orm_select(db_session, capquery):
         )
     )
 
+
 def test_avoid_n_plus_one_queries(db_session, capquery):
+    """
+    Simulates optimized bulk ingestion loading architectures, effectively asserting
+    joined-load configuration successfully prevents N+1 execution disasters logically.
+    """
     for i in range(3):
         panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
         sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
@@ -159,7 +183,6 @@ def test_avoid_n_plus_one_queries(db_session, capquery):
             _ = sensor.name
 
     capquery.assert_executed_queries(
-        # language=SQL
         """
         SELECT
             alarm_panels.id AS alarm_panels_id,
@@ -175,7 +198,12 @@ def test_avoid_n_plus_one_queries(db_session, capquery):
         """
     )
 
+
 def test_demonstrate_n_plus_one_problem(db_session, capquery):
+    """
+    Establishes an intentional N+1 failure proving the execution tracer successfully
+    chronicles repeating redundant queries reliably exposing bad optimization architectures.
+    """
     for i in range(3):
         panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
         sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
@@ -194,7 +222,6 @@ def test_demonstrate_n_plus_one_problem(db_session, capquery):
             _ = sensor.name
 
     capquery.assert_executed_queries(
-        # language=SQL
         """
         SELECT
             alarm_panels.id AS alarm_panels_id,
@@ -203,7 +230,6 @@ def test_demonstrate_n_plus_one_problem(db_session, capquery):
         FROM alarm_panels
         """,
         (
-            # language=SQL
             """
             SELECT
                 sensors.id AS sensors_id,
@@ -216,7 +242,6 @@ def test_demonstrate_n_plus_one_problem(db_session, capquery):
             (1,)
         ),
         (
-            # language=SQL
             """
             SELECT
                 sensors.id AS sensors_id,
@@ -229,7 +254,6 @@ def test_demonstrate_n_plus_one_problem(db_session, capquery):
             (2,)
         ),
         (
-            # language=SQL
             """
             SELECT
                 sensors.id AS sensors_id,

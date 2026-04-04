@@ -1,8 +1,22 @@
+"""
+Explicit parameterization validation tests for the MySQL dialect.
+
+This module validates that the assert_executed_queries functionality correctly
+matches specific, static SQL strings and their corresponding PyMySQL parameters
+within a MySQL integration context.
+"""
+import pytest
 from sqlalchemy.orm import joinedload
 
 from tests.models import AlarmPanel, Sensor
 
+pytestmark = pytest.mark.xdist_group("e2e_mysql")
+
 def test_insert_and_select_normalization(mysql_session, mysql_capquery):
+    """
+    Validate that MySQL inserts and complex joined-load select operations
+    are intercepted and accurately matched against explicitly hardcoded query strings.
+    """
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor = Sensor(name="Front Door", sensor_type="Contact")
     panel.sensors.append(sensor)
@@ -16,7 +30,6 @@ def test_insert_and_select_normalization(mysql_session, mysql_capquery):
     mysql_capquery.assert_executed_queries(
         "BEGIN",
         (
-            # language=SQL
             """
             INSERT INTO alarm_panels (mac_address, is_online)
             VALUES (%(mac_address)s, %(is_online)s)
@@ -24,7 +37,6 @@ def test_insert_and_select_normalization(mysql_session, mysql_capquery):
             {"mac_address": "00:11:22:33:44:55", "is_online": 1}
         ),
         (
-            # language=SQL
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (%(panel_id)s, %(name)s, %(sensor_type)s)
@@ -32,7 +44,6 @@ def test_insert_and_select_normalization(mysql_session, mysql_capquery):
             {"panel_id": 1, "name": "Front Door", "sensor_type": "Contact"}
         ),
         (
-            # language=SQL
             """
             SELECT
                 anon_1.alarm_panels_id AS anon_1_alarm_panels_id,
@@ -58,3 +69,4 @@ def test_insert_and_select_normalization(mysql_session, mysql_capquery):
         ),
         strict=False
     )
+pytestmark = pytest.mark.xdist_group('e2e')

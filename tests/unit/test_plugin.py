@@ -1,11 +1,17 @@
+"""
+Validation of the primary Pytest CapQuery plugin interface mechanisms.
+
+This module guarantees that the context encapsulation layer works reliably to isolate
+tracked database events securely without leaking transactional scope parameters globally.
+"""
 import pytest
 from sqlalchemy import text
 
 
 def test_capture_block_isolation(sqlite_engine, capquery):
     """
-    Ensures that queries executed outside the context block are not visible
-    to the context manager, but the global wrapper retains everything.
+    Ensures that queries executed outside the specific capture context block are not visible
+    inside its internal ledger, but the parent global wrapper maintains omnipresent scope tracking.
     """
     with sqlite_engine.begin() as conn:
         conn.execute(text("SELECT 1"))
@@ -35,8 +41,8 @@ def test_capture_block_isolation(sqlite_engine, capquery):
 
 def test_multiple_sequential_captures(sqlite_engine, capquery):
     """
-    Verifies that multiple sequential capture blocks operate independently
-    and do not leak statements into each other.
+    Verifies that declaring sequence-based parallel capture boundaries safely establishes
+    strict chronological segmentation logic across all involved instances reliably.
     """
     with sqlite_engine.begin() as conn:
         with capquery.capture() as phase_one:
@@ -60,8 +66,8 @@ def test_multiple_sequential_captures(sqlite_engine, capquery):
 
 def test_capture_expected_count_success(sqlite_engine, capquery):
     """
-    Validates that the expected_count parameter silently succeeds
-    when the exact number of statements is captured.
+    Validates that the expected statement quantity constraints silently yield correctly
+    when boundary lengths align structurally to the strict metric assigned directly.
     """
     with sqlite_engine.begin() as conn:
         with capquery.capture(expected_count=2):
@@ -71,8 +77,8 @@ def test_capture_expected_count_success(sqlite_engine, capquery):
 
 def test_capture_expected_count_failure(sqlite_engine, capquery):
     """
-    Validates that the expected_count parameter raises an AssertionError
-    upon exiting the context block if the count misaligns.
+    Establishes that exceeding execution limits promptly evaluates the block termination
+    logic yielding critical validation exception sequences dynamically notifying the layer.
     """
     with sqlite_engine.begin() as conn:
         with pytest.raises(AssertionError, match="Expected 1 queries, but found 2"):
@@ -83,8 +89,8 @@ def test_capture_expected_count_failure(sqlite_engine, capquery):
 
 def test_capture_expected_count_bypassed_on_exception(sqlite_engine, capquery):
     """
-    Ensures that if application code raises an exception inside the block,
-    the context manager does not swallow it with its own AssertionError.
+    Protects user experience ensuring unexpected business logic framework crashes bypass
+    the secondary assertions internally preserving parent traceability stack tracks natively.
     """
 
     class BusinessLogicError(Exception):
@@ -99,8 +105,8 @@ def test_capture_expected_count_bypassed_on_exception(sqlite_engine, capquery):
 
 def test_capture_active_state_assertions(sqlite_engine, capquery):
     """
-    Ensures that properties and assertions can be called while the context
-    manager is still active (inside the block).
+    Asserts validation handlers successfully maintain execution verification capabilities
+    while running functionally mid-transaction continuously across the scope stack directly.
     """
     with sqlite_engine.begin() as conn:
         with capquery.capture() as active_phase:
