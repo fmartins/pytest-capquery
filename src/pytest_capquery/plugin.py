@@ -368,35 +368,6 @@ class CaptureContext(QueryAsserter):
             return self._wrapper.statements[self._start_idx:]
         return self._wrapper.statements[self._start_idx:self._end_idx]
 
-    def assert_matches_snapshot(self) -> None:
-        """
-        Compares this specific capture phase against its corresponding segment
-        in the global test snapshot file.
-        """
-        if not self.snapshot_manager:
-            raise RuntimeError("SnapshotManager is not configured. Ensure capquery fixture is used correctly.")
-
-        if self.snapshot_manager.update_mode:
-            # Serialize the ENTIRE wrapper timeline up to this point so the file is progressively built
-            content = self._wrapper._serialize_snapshot()
-            self.snapshot_manager.save(content)
-            return
-
-        snapshot_content = self.snapshot_manager.load()
-
-        if snapshot_content is None:
-            raise AssertionError(
-                f"No snapshot found for this test.\n"
-                f"Run pytest with `--capquery-update` to generate it at:\n"
-                f"{self.snapshot_manager.snapshot_file}"
-            )
-
-        # Process all expected queries globally and slice just the portion for this phase
-        all_expected_queries = self._deserialize_snapshot(snapshot_content)
-        expected_queries = all_expected_queries[self._start_idx:self._end_idx]
-        self.assert_executed_queries(*expected_queries, strict=True)
-
-
 
 class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
     """Context manager and SQLAlchemy event listener for capturing executed queries."""
