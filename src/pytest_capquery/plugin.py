@@ -9,6 +9,7 @@ This module provides the core functionality for capturing and asserting upon
 SQL statements executed via SQLAlchemy within pytest test cases.
 """
 
+
 import ast
 import functools
 import sys

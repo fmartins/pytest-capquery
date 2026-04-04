@@ -1,52 +1,51 @@
 import pytest
 from sqlalchemy import text
 
+from pytest_capquery.plugin import CapQueryWrapper, SnapshotManager
 
-def test_internal_catching_a_sql_regression(sqlite_engine, capquery, tmp_path):
+
+def test_internal_catching_a_sql_regression(sqlite_engine, db_session, tmp_path):
     """
     INTERNAL: Verifies that a mismatch between the execution timeline and
     the loaded .sql snapshot correctly raises an AssertionError with a diff.
     """
-    capquery.snapshot_manager.snapshot_dir = tmp_path
-    capquery.snapshot_manager.snapshot_file = tmp_path / "regression.sql"
+    test_file = tmp_path / "test_regression.py"
 
-    # 1. Manually force the plugin into update mode to generate the baseline
-    capquery.snapshot_manager.update_mode = True
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as phase:
-            conn.execute(text("SELECT 1"))
+    sm_update = SnapshotManager(nodeid="test_regression", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update) as wrapper_update:
+        with wrapper_update.capture() as phase:
+            db_session.execute(text("SELECT 1"))
         phase.assert_matches_snapshot()
 
-    # 2. Reset the timeline and force it back into read mode
-    capquery.snapshot_manager.update_mode = False
-    capquery.statements.clear()
+    # Reset the session transaction state so the next capture records a fresh BEGIN event
+    db_session.rollback()
 
-    # 3. Simulate a regression (changed query footprint)
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as regression_phase:
-            conn.execute(text("SELECT 2"))
+    sm_read = SnapshotManager(nodeid="test_regression", test_path=test_file, update_mode=False)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_read) as wrapper_read:
+        with wrapper_read.capture() as regression_phase:
+            db_session.execute(text("SELECT 2"))
 
-        # The assertion should catch the difference
         with pytest.raises(AssertionError) as exc_info:
             regression_phase.assert_matches_snapshot()
 
     error_msg = str(exc_info.value)
-    assert "Mismatch at index 0" in error_msg
+    # Index 0 is the BEGIN transaction event, Index 1 is the actual SELECT query
+    assert "Mismatch at index 1" in error_msg
     assert "Expected SQL:\nSELECT 1" in error_msg
     assert "Actual SQL:\nSELECT 2" in error_msg
 
 
-def test_internal_missing_snapshot_file(sqlite_engine, capquery, tmp_path):
+def test_internal_missing_snapshot_file(sqlite_engine, db_session, tmp_path):
     """
     INTERNAL: Ensures the plugin provides helpful instructions if a developer
     calls `assert_matches_snapshot()` before generating the file.
     """
-    capquery.snapshot_manager.snapshot_file = tmp_path / "does_not_exist.sql"
-    capquery.snapshot_manager.update_mode = False
+    test_file = tmp_path / "test_missing.py"
 
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as phase:
-            conn.execute(text("SELECT 1"))
+    sm_read = SnapshotManager(nodeid="test_missing", test_path=test_file, update_mode=False)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_read) as wrapper_read:
+        with wrapper_read.capture() as phase:
+            db_session.execute(text("SELECT 1"))
 
         with pytest.raises(AssertionError) as exc_info:
             phase.assert_matches_snapshot()
@@ -56,29 +55,28 @@ def test_internal_missing_snapshot_file(sqlite_engine, capquery, tmp_path):
     assert "Run pytest with `--capquery-update` to generate it" in error_msg
 
 
-def test_internal_snapshot_file_overwritten_in_update_mode(sqlite_engine, capquery, tmp_path):
+def test_internal_snapshot_file_overwritten_in_update_mode(sqlite_engine, db_session, tmp_path):
     """
     INTERNAL: Ensures that running in update_mode actively overwrites
     an existing snapshot file rather than appending or failing.
     """
-    capquery.snapshot_manager.snapshot_dir = tmp_path
-    capquery.snapshot_manager.snapshot_file = tmp_path / "overwrite.sql"
+    test_file = tmp_path / "test_overwrite.py"
 
-    # Create an initial file
-    capquery.snapshot_manager.update_mode = True
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as phase1:
-            conn.execute(text("SELECT 'OLD'"))
+    sm_update1 = SnapshotManager(nodeid="test_overwrite", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update1) as wrapper_update1:
+        with wrapper_update1.capture() as phase1:
+            db_session.execute(text("SELECT 'OLD'"))
         phase1.assert_matches_snapshot()
 
-    # Run update_mode again with new data
-    capquery.statements.clear()
-    with sqlite_engine.begin() as conn:
-        with capquery.capture() as phase2:
-            conn.execute(text("SELECT 'NEW'"))
+    # Reset the session transaction state
+    db_session.rollback()
+
+    sm_update2 = SnapshotManager(nodeid="test_overwrite", test_path=test_file, update_mode=True)
+    with CapQueryWrapper(sqlite_engine, snapshot_manager=sm_update2) as wrapper_update2:
+        with wrapper_update2.capture() as phase2:
+            db_session.execute(text("SELECT 'NEW'"))
         phase2.assert_matches_snapshot()
 
-    # Verify the file was overwritten, not appended
-    content = capquery.snapshot_manager.snapshot_file.read_text()
+    content = sm_update2.snapshot_file.read_text()
     assert "SELECT 'NEW'" in content
     assert "SELECT 'OLD'" not in content
