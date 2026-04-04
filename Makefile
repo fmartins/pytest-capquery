@@ -1,45 +1,45 @@
 .DEFAULT_GOAL := help
 .PHONY: setup setup-env install test tdd db-up db-down clean format check-format help
 
-help:
+help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1,$$2 }' $(MAKEFILE_LIST)
 
-setup: setup-env install
+setup: setup-env install ## Full local setup: install pyenv python, create venv, and install deps
 
-setup-env:
+setup-env: ## Install local python version via pyenv (macOS/Linux dev only)
 	pyenv install -s 3.13.0
 	pyenv local 3.13.0
 
-install:
+install: ## Create venv and install dependencies
 	python -m venv .venv
 	./.venv/bin/pip install -U pip
 	./.venv/bin/pip install -e '.[test]'
 	./.venv/bin/pre-commit install
 
-db-up:
+db-up: ## Start Docker Compose databases
 	docker compose up -d
 	@echo "Waiting for databases to be ready..."
 	@sleep 10
 	@echo "Databases are ready."
 
-db-down:
+db-down: ## Tear down Docker Compose databases
 	docker compose down -v
 
-test: db-up
+test: db-up ## Run all tests with code coverage and test analytics
 	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/ || (make db-down && exit 1)
 	make db-down
 
-tdd: db-up
+tdd: db-up ## Run tests in watch mode for test-driven development
 	./.venv/bin/ptw src/ tests/ --now --runner ./.venv/bin/pytest -vvv -p no:capquery --capquery-update || (make db-down && exit 1)
 	make db-down
 
-clean:
+clean: ## Remove virtual environment and cached files
 	rm -rf .venv
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/
 
-format:
+format: ## Run Prettier to format markdown, yaml, and json files
 	npx prettier --write .
 
-check-format:
+check-format: ## Check if files comply with Prettier formatting (for CI)
 	npx prettier --check .
