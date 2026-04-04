@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "pytest",
-    "pytest-watcher",
     "sqlalchemy",
     "sqlparse",
     "sqlalchemy-capture-sql"
@@ -21,15 +20,13 @@ capquery = "pytest_capquery.plugin"
 
 [project.optional-dependencies]
 test = [
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-    "sqlalchemy-capture-sql",
-    "sqlparse",
+    "cryptography",
+    "pre-commit",
     "psycopg2-binary",
     "pymysql",
-    "cryptography",
-    "pre-commit"
+    "pytest-cov",
+    "pytest-watcher",
+    "pytest-xdist"
 ]
 
 [tool.coverage.run]
