@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 from tests.models import AlarmPanel, Sensor
 
 
-def test_orm_insert(sqlite_session, capquery):
+def test_orm_insert(sqlite_session, sqlite_capquery):
     """Ensures that standard sequential class-based object insertions resolve distinctly to correct
     parameter tuple bounds perfectly matching standard SQL generation paths."""
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
@@ -20,10 +20,10 @@ def test_orm_insert(sqlite_session, capquery):
 
     sqlite_session.add(panel)
 
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
     sqlite_session.flush()
 
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         "BEGIN",
         (
             """
@@ -49,19 +49,19 @@ def test_orm_insert(sqlite_session, capquery):
     )
 
 
-def test_orm_update(sqlite_session, capquery):
+def test_orm_update(sqlite_session, sqlite_capquery):
     """Confirms targeted object parameter replacement automatically delegates strict SQL update
     strings precisely bounded against verified schema definitions continuously."""
     panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=False)
     sqlite_session.add(panel)
     sqlite_session.flush()
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
 
     panel = sqlite_session.query(AlarmPanel).filter_by(mac_address="AA:BB:CC:DD:EE:FF").first()
     panel.is_online = True
     sqlite_session.flush()
 
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         (
             """
             SELECT
@@ -85,7 +85,7 @@ def test_orm_update(sqlite_session, capquery):
     )
 
 
-def test_orm_delete(sqlite_session, capquery):
+def test_orm_delete(sqlite_session, sqlite_capquery):
     """Validates cascaded removal triggers corresponding object deletion queries cleanly leaving
     exact session markers fully transparent for regression checking layers."""
     panel = AlarmPanel(mac_address="11:22:33:44:55:66", is_online=True)
@@ -94,13 +94,13 @@ def test_orm_delete(sqlite_session, capquery):
     sqlite_session.add(panel)
     sqlite_session.flush()
 
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
 
     sensor_to_delete = sqlite_session.query(Sensor).filter_by(name="Back Door").first()
     sqlite_session.delete(sensor_to_delete)
     sqlite_session.flush()
 
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         (
             """
             SELECT
@@ -124,21 +124,21 @@ def test_orm_delete(sqlite_session, capquery):
     )
 
 
-def test_orm_select(sqlite_session, capquery):
+def test_orm_select(sqlite_session, sqlite_capquery):
     """Assures simple declarative fetching routines bypass unnecessary engine overheads, directly
     exposing concise limiting offset targets deterministically properly."""
     panel = AlarmPanel(mac_address="22:33:44:55:66:77", is_online=False)
     sqlite_session.add(panel)
     sqlite_session.flush()
 
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
 
     fetched_panel = (
         sqlite_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
     )
 
     assert fetched_panel is not None
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         (
             """
             SELECT
@@ -154,7 +154,7 @@ def test_orm_select(sqlite_session, capquery):
     )
 
 
-def test_avoid_n_plus_one_queries(sqlite_session, capquery):
+def test_avoid_n_plus_one_queries(sqlite_session, sqlite_capquery):
     """Simulates optimized bulk ingestion loading architectures, effectively asserting joined-load
     configuration successfully prevents N+1 execution disasters logically."""
     for i in range(3):
@@ -165,7 +165,7 @@ def test_avoid_n_plus_one_queries(sqlite_session, capquery):
     sqlite_session.flush()
     sqlite_session.expunge_all()
 
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
 
     panels = sqlite_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).all()
 
@@ -174,7 +174,7 @@ def test_avoid_n_plus_one_queries(sqlite_session, capquery):
         for sensor in panel.sensors:
             _ = sensor.name
 
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         """
         SELECT
             alarm_panels.id AS alarm_panels_id,
@@ -191,7 +191,7 @@ def test_avoid_n_plus_one_queries(sqlite_session, capquery):
     )
 
 
-def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
+def test_demonstrate_n_plus_one_problem(sqlite_session, sqlite_capquery):
     """Establishes an intentional N+1 failure proving the execution tracer successfully chronicles
     repeating redundant queries reliably exposing bad optimization architectures."""
     for i in range(3):
@@ -202,7 +202,7 @@ def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
     sqlite_session.flush()
     sqlite_session.expunge_all()
 
-    capquery.statements.clear()
+    sqlite_capquery.statements.clear()
 
     panels = sqlite_session.query(AlarmPanel).all()
 
@@ -211,7 +211,7 @@ def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
         for sensor in panel.sensors:
             _ = sensor.name
 
-    capquery.assert_executed_queries(
+    sqlite_capquery.assert_executed_queries(
         """
         SELECT
             alarm_panels.id AS alarm_panels_id,

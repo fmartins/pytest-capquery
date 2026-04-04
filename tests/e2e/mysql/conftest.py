@@ -5,7 +5,6 @@ replicate production-grade execution topologies. All open connections and pools 
 invalidated during teardown to maintain environment integrity and suppress system resource warnings.
 """
 
-from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -59,15 +58,12 @@ def mysql_session(mysql_engine: Engine) -> Generator[Session, None, None]:
 
 @pytest.fixture(scope="function")
 def mysql_capquery(
-    request: pytest.FixtureRequest, mysql_engine: Engine
+    mysql_engine: Engine, capquery_context: SnapshotManager
 ) -> Generator[CapQueryWrapper, None, None]:
     """Provide an engine-bound CapQuery interception interface for MySQL.
 
-    Catches and tracks PyMySQL Dialect queries executed through the provisioned engine.
+    Catches and tracks PyMySQL Dialect queries executed through the provisioned engine, leveraging
+    the globally provided snapshot context.
     """
-    update_mode = request.config.getoption("--capquery-update", default=False)
-    snapshot_manager = SnapshotManager(
-        nodeid=request.node.nodeid, test_path=Path(request.node.path), update_mode=update_mode
-    )
-    with CapQueryWrapper(mysql_engine, snapshot_manager=snapshot_manager) as captured:
+    with CapQueryWrapper(mysql_engine, snapshot_manager=capquery_context) as captured:
         yield captured

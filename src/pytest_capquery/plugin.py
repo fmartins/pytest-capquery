@@ -7,7 +7,9 @@ This module hooks into SQLAlchemy event loops orchestrating the translation
 between execution logs over to assertions models natively surfacing the capquery local features.
 """
 
-import ast
+import datetime
+import decimal
+import uuid
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -168,7 +170,17 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             if not query_str:
                 continue
 
-            params = ast.literal_eval(params_str)
+            eval_globals = {
+                "__builtins__": None,
+                "datetime": datetime.datetime,
+                "date": datetime.date,
+                "time": datetime.time,
+                "timedelta": datetime.timedelta,
+                "FakeDatetime": datetime.datetime,
+                "Decimal": decimal.Decimal,
+                "UUID": uuid.UUID,
+            }
+            params = eval(params_str, eval_globals)
             item = query_str if params is None else (query_str, params)
 
             while len(phases) < phase_num:
@@ -198,21 +210,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture
-def capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> CapQueryWrapper:
-    """High-level standard testing interface securely delivering functional interception wrappers.
-    This fixture is specifically configured natively defaulting to standard SQLite validation.
+def capquery_context(request: pytest.FixtureRequest) -> SnapshotManager:
+    """Dynamically resolves snapshot disk mapping parameters transparently intercepting CLI flags.
 
     Args:
         request (pytest.FixtureRequest): The test execution meta properties injected natively.
-        sqlite_engine (Engine): The dynamically provisioned SQLite integration execution engine instance.
 
     Returns:
-        CapQueryWrapper: An initialized interception footprint resolving assertions intelligently.
+        SnapshotManager: An initialized and locally configured snapshot filesystem driver.
     """
-    update_mode = request.config.getoption("--capquery-update")
-    snapshot_manager = SnapshotManager(
-        nodeid=request.node.nodeid, test_path=Path(request.node.path), update_mode=update_mode
-    )
+    update_mode = request.config.getoption("--capquery-update", default=False)
+    test_path = Path(request.node.path) if hasattr(request.node, "path") else Path.cwd()
 
-    with CapQueryWrapper(sqlite_engine, snapshot_manager=snapshot_manager) as captured:
-        yield captured
+    return SnapshotManager(nodeid=request.node.nodeid, test_path=test_path, update_mode=update_mode)
