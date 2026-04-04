@@ -52,6 +52,14 @@ The plugin does not provide a default database fixture, as it is designed to ada
 SQLAlchemy topology. You **must** define a global fixture in your `conftest.py` to bind
 `pytest-capquery` to your project's database engine.
 
+Quick references:
+
+- [Pytest fixture configuring the DB engine & Capquery context](https://github.com/fmartins/pytest-capquery/blob/main/tests/e2e/postgres/conftest.py)
+- [Test sample using the capquery snapshot support](https://github.com/fmartins/pytest-capquery/blob/main/tests/e2e/postgres/test_snapshot.py)
+- [Test asset for documentation and easy review of the DBA](https://github.com/fmartins/pytest-capquery/blob/main/tests/e2e/postgres/__capquery_snapshots__/test_snapshot/test_insert_and_select_snapshot.sql)
+- [Test sample using the super verbose inline SQL](https://github.com/fmartins/pytest-capquery/blob/main/tests/e2e/postgres/test_assert_executed_queries.py)
+  
+
 ### 1. Setting Up Your Fixture (`conftest.py`)
 
 To intercept queries from your custom engine, use the `CapQueryWrapper` and inject the
