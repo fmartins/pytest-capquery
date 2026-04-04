@@ -1,7 +1,8 @@
 import pytest
 from sqlalchemy import text
 
-from pytest_capquery.plugin import CapQueryWrapper, SnapshotManager
+from pytest_capquery.plugin import CapQueryWrapper
+from pytest_capquery.snapshot import SnapshotManager
 
 
 def test_internal_catching_a_sql_regression(sqlite_engine, db_session, tmp_path):

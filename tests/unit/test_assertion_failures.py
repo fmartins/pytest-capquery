@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import text
 
-from pytest_capquery.plugin import TxEvent
+from pytest_capquery.models import TxEvent
 
 
 def test_assertion_error_count_mismatch(capquery, sqlite_engine):

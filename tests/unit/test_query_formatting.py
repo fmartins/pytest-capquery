@@ -1,5 +1,5 @@
 import pytest
-from pytest_capquery.plugin import reformat_query, _normalize_params
+from pytest_capquery.formatter import normalize_params, reformat_query
 
 
 def test_reformat_query_multiple_queries():
@@ -32,8 +32,8 @@ def test_normalize_params_dictionary_sorting():
     params1 = {"b": 2, "a": 1}
     params2 = {"a": 1, "b": 2}
 
-    norm1 = _normalize_params(params1)
-    norm2 = _normalize_params(params2)
+    norm1 = normalize_params(params1)
+    norm2 = normalize_params(params2)
 
     assert norm1 == (("a", 1), ("b", 2))
     assert norm1 == norm2
@@ -46,13 +46,13 @@ def test_normalize_params_list_and_tuple_conversion():
     params = [1, {"z": 26, "y": 25}, [3, 4]]
     expected = (1, (("y", 25), ("z", 26)), (3, 4))
 
-    assert _normalize_params(params) == expected
+    assert normalize_params(params) == expected
 
 
 def test_normalize_params_scalars():
     """
     Ensures primitive types pass through normalization completely unchanged.
     """
-    assert _normalize_params(1) == 1
-    assert _normalize_params("string") == "string"
-    assert _normalize_params(None) is None
+    assert normalize_params(1) == 1
+    assert normalize_params("string") == "string"
+    assert normalize_params(None) is None
