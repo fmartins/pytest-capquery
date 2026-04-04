@@ -60,7 +60,6 @@ def sqlite_session(sqlite_engine: Engine) -> Generator[Session, None, None]:
     session.close()
 
 
-
 @pytest.fixture(scope="function")
 def sqlite_capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> Generator[CapQueryWrapper, None, None]:
     """
