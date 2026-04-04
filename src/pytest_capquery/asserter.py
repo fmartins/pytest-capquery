@@ -1,5 +1,9 @@
 """
-Asserter.
+Core payload evaluation and terminal output construction logic.
+
+This module contains the rigorous verification algorithms matching dynamically captured runtime
+transactions against developer hardcoded expectations, alongside sophisticated terminal formatting
+helpers assisting users rectifying timeline failures.
 """
 import sys
 import textwrap
@@ -11,13 +15,24 @@ from pytest_capquery.snapshot import SnapshotManager
 
 
 class QueryAsserter:
+    """
+    Execution evaluation processor dynamically walking intercepted statement buffers,
+    verifying structure, length, bounds mapping, while robustly rendering terminal errors.
+    """
     snapshot_manager: Optional[SnapshotManager] = None
 
     def _normalize_statement(self, item: Any) -> CapturedStmt:
+        """
+        Enforces execution payloads map natively mapping standard tracking protocols.
+        """
         return cast(CapturedStmt, item)
 
     @property
     def copy_paste_block(self) -> str:
+        """
+        Algorithmically generates perfectly synthesized fully executable assertion blocks
+        matching exactly the actually intercepted runtime sequence to vastly accelerate developer velocity.
+        """
         lines = []
         for raw_stmt in self.statements:
             stmt = self._normalize_statement(raw_stmt)
@@ -35,7 +50,6 @@ class QueryAsserter:
             if stmt.parameters is not None:
                 lines.append(
                     "    (\n"
-                    "        # language=SQL\n"
                     '        """\n'
                     f"{indented_sql}\n"
                     '        """,\n'
@@ -44,7 +58,6 @@ class QueryAsserter:
                 )
             else:
                 lines.append(
-                    "    # language=SQL\n"
                     '    """\n'
                     f"{indented_sql}\n"
                     '    """'
@@ -55,6 +68,9 @@ class QueryAsserter:
 
     @property
     def queries_history(self) -> str:
+        """
+        Formats dynamically collected queries structurally delivering detailed runtime traces for terminal output formatting.
+        """
         out = []
         for raw_stmt in self.statements:
             stmt = self._normalize_statement(raw_stmt)
@@ -66,9 +82,15 @@ class QueryAsserter:
 
     @property
     def help(self) -> str:
+        """
+        Provides direct troubleshooting context delivering raw sequence markers.
+        """
         return f"Captured queries:\n{self.queries_history}"
 
     def _fail_with_instructions(self, error_msg: str) -> None:
+        """
+        Breaks standard test execution flow decisively rendering developer acceleration syntax trees correctly into sys.stdout natively preventing framework hiding.
+        """
         divider = "=" * 80
         out = (
             f"\n{divider}\n"
@@ -82,6 +104,9 @@ class QueryAsserter:
         raise AssertionError(f"{error_msg}\n\n(See 'Captured stdout call' above for the copy-paste block)")
 
     def assert_executed_queries(self, *expected_queries: Union[str, Tuple[str, Any]], strict: bool = True) -> None:
+        """
+        Primary execution surface navigating provided argument targets meticulously comparing them comprehensively against the intercept state.
+        """
         if strict:
             self.assert_total_queries(len(expected_queries))
 
@@ -133,6 +158,9 @@ class QueryAsserter:
                     )
 
     def assert_total_queries(self, expected_total_queries: int) -> None:
+        """
+        Guarantees strict chronometric lengths matching runtime assertions perfectly preventing unverified subsequent code blocks silently executing.
+        """
         if len(self.statements) != expected_total_queries:
             self._fail_with_instructions(
                 f"Expected {expected_total_queries} queries, but found {len(self.statements)}.\n\n{self.help}"
@@ -140,7 +168,13 @@ class QueryAsserter:
 
 
 class CaptureContext(QueryAsserter):
+    """
+    A specific localized evaluation engine binding transient query markers directly returning controlled bounds isolation capabilities dynamically handling nesting natively.
+    """
     def __init__(self, wrapper: Any, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> None:
+        """
+        Stores evaluation scopes tightly tracking absolute underlying pointers bridging execution spaces securely safely.
+        """
         self._wrapper = wrapper
         self._expected_count = expected_count
         self._assert_snapshot = assert_snapshot
@@ -152,11 +186,17 @@ class CaptureContext(QueryAsserter):
         self._phase_idx = 0
 
     def __enter__(self) -> "CaptureContext":
+        """
+        Registers active cursor offsets seamlessly.
+        """
         self._start_idx = len(self._wrapper.statements)
         self._active = True
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Releases cursor trackers gracefully optionally dispatching native assertion comparisons or persistence file resolutions correctly safely terminating.
+        """
         self._end_idx = len(self._wrapper.statements)
         self._active = False
 
@@ -173,11 +213,17 @@ class CaptureContext(QueryAsserter):
 
     @property
     def statements(self) -> List[Any]:
+        """
+        Discovers exactly targeted transient transaction arrays automatically computing accurate pointer windows independently from global spaces tightly flexibly.
+        """
         if self._active:
             return self._wrapper.statements[self._start_idx:]
         return self._wrapper.statements[self._start_idx:self._end_idx]
 
     def assert_matches_snapshot(self) -> None:
+        """
+        Triggers underlying physical verification channels pulling serialization matrices and testing accurately strictly resolving missing paths transparently correctly safely.
+        """
         if not self.snapshot_manager:
             raise RuntimeError("SnapshotManager is not configured. Ensure capquery fixture is used correctly.")
 

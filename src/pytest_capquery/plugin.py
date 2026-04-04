@@ -4,8 +4,8 @@ Pytest Capquery Plugin.
 License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 Author: Felipe Cardoso Martins <felipe.cardoso.martins@gmail.com>
 
-This module provides the core functionality for capturing and asserting upon
-SQL statements executed via SQLAlchemy within pytest test cases.
+This module hooks into SQLAlchemy event loops orchestrating the translation
+between execution logs over to assertions models natively surfacing the capquery local features.
 """
 
 import ast
@@ -23,14 +23,25 @@ from pytest_capquery.snapshot import SnapshotManager
 
 
 class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
+    """
+    The principal orchestration block bridging standard intercept hooks tightly onto
+    internal verification ledgers. Translates database connection signals actively
+    and provisions isolated context managers.
+    """
     _listeners: Dict[str, Callable[[Connection], None]]
 
     def __init__(self, engine: Engine, snapshot_manager: Optional[SnapshotManager] = None) -> None:
+        """
+        Instantiates wrapper payload collections against the provided SQLAlchemy Engine.
+        """
         super().__init__(engine)
         self.snapshot_manager = snapshot_manager
         self.phases: List[Dict[str, Any]] = []
 
     def __enter__(self) -> "CapQueryWrapper":
+        """
+        Registers core lifecycle event traps establishing tracking footprints seamlessly.
+        """
         super().__enter__()
         self._listeners = {
             "begin": lambda conn: self.statements.append(TxEvent("BEGIN")),
@@ -42,14 +53,25 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """
+        Cleans dynamically wired framework event traps ensuring pristine un-contaminated exits.
+        """
         for name, fn in self._listeners.items():
             event.remove(self.engine, name, fn)
         super().__exit__(exc_type, exc_val, exc_tb)
 
     def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> CaptureContext:
+        """
+        Generates and scopes a distinctly detached logic block delegating boundary mapping
+        while pushing results toward the standard sequential ledger seamlessly.
+        """
         return CaptureContext(self, expected_count, assert_snapshot, alias)
 
     def _serialize_snapshot(self) -> str:
+        """
+        Translates raw parameter maps and SQL blocks logically into explicitly formed disk
+        persistence definitions.
+        """
         lines = []
         query_counter = 1
         for phase_idx, phase in enumerate(self.phases, 1):
@@ -72,6 +94,10 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         return "\n".join(lines).strip() + "\n"
 
     def _deserialize_snapshot(self, content: str) -> List[List[Union[str, Tuple[str, Any]]]]:
+        """
+        Navigates disk strings reversing parameter definitions directly up toward standard
+        internal comparative models properly handling sequence parsing cleanly.
+        """
         phases: List[List[Union[str, Tuple[str, Any]]]] = []
 
         blocks = content.split("-- CAPQUERY:")
@@ -109,6 +135,9 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
+    """
+    Extends the native testing client bridging explicitly required execution arguments.
+    """
     group = parser.getgroup("capquery", "SQLAlchemy Query Assertions")
     group.addoption(
         "--capquery-update",
@@ -120,6 +149,10 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 @pytest.fixture
 def capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> CapQueryWrapper:
+    """
+    High-level standard testing interface securely delivering functional interception wrappers.
+    This fixture is specifically configured natively defaulting to standard SQLite validation.
+    """
     update_mode = request.config.getoption("--capquery-update")
     snapshot_manager = SnapshotManager(
         nodeid=request.node.nodeid,
