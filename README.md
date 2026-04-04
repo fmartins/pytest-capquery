@@ -48,22 +48,68 @@ pip install pytest-capquery
 
 ## Quick Start
 
-The `capquery` fixture captures all SQLAlchemy statements executed by your code. The best practice
-is to use the `capture()` context manager to isolate specific execution phases.
+The plugin does not provide a default database fixture, as it is designed to adapt to your specific
+SQLAlchemy topology. You **must** define a global fixture in your `conftest.py` to bind
+`pytest-capquery` to your project's database engine.
 
-### 1. Documenting with SQL Snapshots (Recommended)
+### 1. Setting Up Your Fixture (`conftest.py`)
+
+To intercept queries from your custom engine, use the `CapQueryWrapper` and inject the
+`capquery_context` fixture (which automatically handles snapshot file resolution behind the scenes).
+
+#### Standard Synchronous Engines
+
+```python
+import pytest
+from pytest_capquery.plugin import CapQueryWrapper
+
+@pytest.fixture(scope="function")
+def postgres_capquery(postgres_engine, capquery_context):
+    """Binds capquery to a custom PostgreSQL testing engine."""
+    with CapQueryWrapper(postgres_engine, snapshot_manager=capquery_context) as captured:
+        yield captured
+```
+
+#### Asynchronous Engines (`AsyncEngine`)
+
+If your project uses SQLAlchemy's `AsyncEngine` (e.g., with `asyncpg` or `aiomysql`), you **must**
+attach the wrapper to the underlying synchronous engine. SQLAlchemy does not support event listeners
+directly on async engine proxies.
+
+```python
+import pytest
+from pytest_capquery.plugin import CapQueryWrapper
+
+@pytest.fixture(scope="function")
+def async_pg_capquery(async_pg_engine, capquery_context):
+    """
+    Binds capquery to an AsyncEngine by intercepting the underlying .sync_engine.
+    This prevents 'NotImplementedError: asynchronous events are not implemented' errors.
+    """
+    with CapQueryWrapper(async_pg_engine.sync_engine, snapshot_manager=capquery_context) as captured:
+        yield captured
+```
+
+By following this pattern, your custom fixtures automatically inherit the full snapshot lifecycle,
+error tracking, and CLI flags (`--capquery-update`) without needing to manually map test paths or
+instantiate `SnapshotManager` objects.
+
+### 2. Documenting with SQL Snapshots (Recommended)
 
 The most efficient way to document and protect your queries is by utilizing physical snapshots. This
 automatically compares execution behavior against tracked `.sql` files stored in a
 `__capquery_snapshots__` directory.
 
+Use the custom fixture you defined (e.g., `postgres_capquery`) and the `capture()` context manager
+to isolate specific execution phases.
+
 ```python
-def test_update_user_status(sqlite_session, capquery):
+def test_update_user_status(postgres_session, postgres_capquery):
     # Enable assert_snapshot to verify execution against the disk
-    with capquery.capture(assert_snapshot=True):
-        user = sqlite_session.query(User).filter_by(id=1).first()
+    with postgres_capquery.capture(assert_snapshot=True):
+        user = postgres_session.query(User).filter_by(id=1).first()
         user.status = "active"
-        sqlite_session.commit()
+        postgres_session.commit()
 ```
 
 **Workflow:** When writing a new test or updating existing query logic, run Pytest with the update
@@ -76,17 +122,17 @@ pytest --capquery-update
 Future runs without the flag will strictly assert that the runtime queries perfectly match the
 generated `.sql` file.
 
-### 2. Manual Explicit Assertions (Verbose)
+### 3. Manual Explicit Assertions (Verbose)
 
 If you prefer to explicitly document the executed SQL directly inside your test cases, you can use
 strict manual assertions.
 
 ```python
-def test_update_user_status(sqlite_session, capquery):
-    with capquery.capture() as phase:
-        user = sqlite_session.query(User).filter_by(id=1).first()
+def test_update_user_status(postgres_session, postgres_capquery):
+    with postgres_capquery.capture() as phase:
+        user = postgres_session.query(User).filter_by(id=1).first()
         user.status = "active"
-        sqlite_session.commit()
+        postgres_session.commit()
 
     # Verify the precise chronological timeline of the transaction
     phase.assert_executed_queries(
@@ -95,13 +141,13 @@ def test_update_user_status(sqlite_session, capquery):
             """
             SELECT users.id, users.status
             FROM users
-            WHERE users.id = ?
+            WHERE users.id = %s
             """,
             (1,)
         ),
         (
             """
-            UPDATE users SET status=? WHERE users.id = ?
+            UPDATE users SET status=%s WHERE users.id = %s
             """,
             ("active", 1)
         ),
@@ -114,17 +160,17 @@ and the assertion fails, `pytest-capquery` will intercept the failure and drop t
 assertion block directly into your terminal's stdout. Simply copy and paste the block from your
 terminal directly into your test to instantly fix the regression!
 
-### 3. Preventing N+1 Queries (Loose Assertion)
+### 4. Preventing N+1 Queries (Loose Assertion)
 
 If you want to protect a block of code against N+1 regressions without hardcoding exact SQL strings,
 you can enforce a strict expected query count at the context boundary:
 
 ```python
-def test_fetch_users(sqlite_session, capquery):
+def test_fetch_users(postgres_session, postgres_capquery):
     # Enforce that exactly 1 query is executed inside this block.
     # If a lazy-loading loop triggers extra queries, this will raise an AssertionError.
-    with capquery.capture(expected_count=1):
-        users = sqlite_session.query(User).all()
+    with postgres_capquery.capture(expected_count=1):
+        users = postgres_session.query(User).all()
         for user in users:
             _ = user.address
 ```
