@@ -5,6 +5,7 @@ database fixture that is shared across both unit and end-to-end tests. It ensure
 constructed and torn down properly to prevent resource leakage.
 """
 
+import gc
 from pathlib import Path
 from typing import Generator
 
@@ -45,16 +46,23 @@ def sqlite_engine() -> Generator[Engine, None, None]:
 def sqlite_session(sqlite_engine: Engine) -> Generator[Session, None, None]:
     """Function-scoped fixture providing a localized SQLAlchemy Session.
 
-    This ensures each test receives a clean transaction boundary. After the test yields, any open
-    transaction is rolled back, and the session is formally closed.
+    By returning to standard engine-binding, we preserve SQLAlchemy's natural `autobegin`
+    timeline, which capquery relies on to capture the `BEGIN` statement exactly when the
+    application triggers it.
     """
     SessionMaker = sessionmaker(bind=sqlite_engine)
     session = SessionMaker()
 
     yield session
 
+    # Standard teardown
     session.rollback()
     session.close()
+
+    # Force Python 3.13 Garbage Collection to sweep any lingering ORM objects mapped to the
+    # session before Pytest tears down the scope. This safely eliminates the intermittent SQLite
+    # ResourceWarnings without altering transactional boundaries.
+    gc.collect()
 
 
 @pytest.fixture(scope="function")
