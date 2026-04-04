@@ -78,6 +78,17 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             event.remove(self.engine, name, fn)
         super().__exit__(exc_type, exc_val, exc_tb)
 
+        if hasattr(self, "_cur") and self._cur:
+            try:
+                self._cur.close()
+            except Exception:
+                pass
+        if hasattr(self, "connection") and self.connection:
+            try:
+                self.connection.close()
+            except Exception:
+                pass
+
     def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> CaptureContext:
         """
         Generates and scopes a distinctly detached logic block delegating boundary mapping

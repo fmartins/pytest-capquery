@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
+
+pytest.register_assert_rewrite("pytest_capquery.plugin")
+
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,7 +21,6 @@ from pytest_capquery.plugin import CapQueryWrapper
 from pytest_capquery.snapshot import SnapshotManager
 from tests.models import Base
 
-pytest.register_assert_rewrite("pytest_capquery.plugin")
 pytest_plugins = ["pytest_capquery.plugin"]
 
 
@@ -38,10 +40,6 @@ def sqlite_engine() -> Generator[Engine, None, None]:
     yield engine
 
     Base.metadata.drop_all(engine)
-
-    with engine.connect() as conn:
-        conn.invalidate()
-
     engine.dispose()
 
 
