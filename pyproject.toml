@@ -31,6 +31,12 @@ test = [
     "ruff"
 ]
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Silence Python 3.13 GC warnings when cleaning up SQLAlchemy SQLite memory connections
+    "ignore:unclosed database in <sqlite3.Connection:ResourceWarning",
+]
+
 [tool.coverage.run]
 source = ["src/pytest_capquery"]
 omit = ["tests/*"]
