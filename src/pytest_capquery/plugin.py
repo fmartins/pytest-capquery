@@ -7,7 +7,6 @@ This module hooks into SQLAlchemy event loops orchestrating the translation
 between execution logs over to assertions models natively surfacing the capquery local features.
 """
 
-import ast
 import datetime
 import decimal
 import uuid
@@ -224,19 +223,3 @@ def capquery_context(request: pytest.FixtureRequest) -> SnapshotManager:
     test_path = Path(request.node.path) if hasattr(request.node, "path") else Path.cwd()
 
     return SnapshotManager(nodeid=request.node.nodeid, test_path=test_path, update_mode=update_mode)
-
-
-@pytest.fixture
-def capquery(sqlite_engine: Engine, capquery_context: SnapshotManager) -> CapQueryWrapper:
-    """High-level standard testing interface securely delivering functional interception wrappers.
-    This fixture is specifically configured natively defaulting to standard SQLite validation.
-
-    Args:
-        sqlite_engine (Engine): The dynamically provisioned SQLite integration execution engine instance.
-        capquery_context (SnapshotManager): The dynamically resolved test context environment footprint.
-
-    Returns:
-        CapQueryWrapper: An initialized interception footprint resolving assertions intelligently.
-    """
-    with CapQueryWrapper(sqlite_engine, snapshot_manager=capquery_context) as captured:
-        yield captured

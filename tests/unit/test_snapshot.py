@@ -13,7 +13,7 @@ from pytest_capquery.snapshot import SnapshotManager
 from tests.models import AlarmPanel, Sensor
 
 
-def test_user_business_logic(sqlite_session, capquery):
+def test_user_business_logic(sqlite_session, sqlite_capquery):
     """Simulates a standard practical snapshot generation sequence, verifying the plugin captures
     local nested blocks directly resolving them appropriately against implicit automated file
     allocations automatically tied to the host test invocation."""
@@ -21,13 +21,13 @@ def test_user_business_logic(sqlite_session, capquery):
     sqlite_session.add(panel)
     sqlite_session.flush()
 
-    with capquery.capture(assert_snapshot=True):
+    with sqlite_capquery.capture(assert_snapshot=True):
         sensor = Sensor(name="Front Door", sensor_type="Contact")
         panel.sensors.append(sensor)
         sqlite_session.flush()
 
 
-def test_user_multiple_phases(sqlite_session, capquery):
+def test_user_multiple_phases(sqlite_session, sqlite_capquery):
     """Confirms multiple capture phases inside single transaction tests write and check their
     relative sequential markers distinctly within the overarching module scope.
 
@@ -35,17 +35,17 @@ def test_user_multiple_phases(sqlite_session, capquery):
     """
     panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=True)
 
-    with capquery.capture(assert_snapshot=True, alias="Panel Setup Phase"):
+    with sqlite_capquery.capture(assert_snapshot=True, alias="Panel Setup Phase"):
         sqlite_session.add(panel)
         sqlite_session.flush()
 
-    with capquery.capture(assert_snapshot=True):
+    with sqlite_capquery.capture(assert_snapshot=True):
         sensor_1 = Sensor(name="Living Room", sensor_type="Motion")
         sensor_2 = Sensor(name="Back Door", sensor_type="Contact")
         panel.sensors.extend([sensor_1, sensor_2])
         sqlite_session.flush()
 
-    with capquery.capture(assert_snapshot=True, alias="Status Toggle and Deletion Phase"):
+    with sqlite_capquery.capture(assert_snapshot=True, alias="Status Toggle and Deletion Phase"):
         panel.is_online = False
         panel.sensors.remove(sensor_1)
         sqlite_session.flush()
