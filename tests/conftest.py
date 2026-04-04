@@ -6,14 +6,16 @@ SQLite database fixture that is shared across both unit and end-to-end tests.
 It ensures fixtures are constructed and torn down properly to prevent resource leakage.
 """
 
+from pathlib import Path
 from typing import Generator
-import pytest
 
+import pytest
 from sqlalchemy import create_engine, Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from pytest_capquery.plugin import CapQueryWrapper
+from pytest_capquery.snapshot import SnapshotManager
 from tests.models import Base
 
 pytest.register_assert_rewrite("pytest_capquery.plugin")
@@ -60,19 +62,6 @@ def sqlite_session(sqlite_engine: Engine) -> Generator[Session, None, None]:
     session.close()
 
 
-@pytest.fixture(scope="function")
-def db_session(sqlite_session: Session) -> Session:
-    """
-    Alias fixture for unit tests expecting a generic db_session.
-
-    Provides transparent compatibility for test functions that do not explicitly require
-    the SQLite variant but need a standard database session interface.
-    """
-    return sqlite_session
-
-
-from pathlib import Path
-from pytest_capquery.snapshot import SnapshotManager
 
 @pytest.fixture(scope="function")
 def sqlite_capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> Generator[CapQueryWrapper, None, None]:

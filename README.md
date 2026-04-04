@@ -54,11 +54,11 @@ If you want to protect a block of code against N+1 regressions without hardcodin
 you can enforce a strict expected query count at the context boundary:
 
 ```python
-def test_fetch_users(db_session, capquery):
+def test_fetch_users(sqlite_session, capquery):
     # Enforce that exactly 1 query is executed inside this block.
     # If a lazy-loading loop triggers extra queries, this will raise an AssertionError.
     with capquery.capture(expected_count=1):
-        users = db_session.query(User).all()
+        users = sqlite_session.query(User).all()
         for user in users:
             _ = user.address
 ```
@@ -69,11 +69,11 @@ For mission-critical operations, you can capture a phase and rigorously assert t
 parameters executed:
 
 ```python
-def test_update_user_status(db_session, capquery):
+def test_update_user_status(sqlite_session, capquery):
     with capquery.capture() as phase:
-        user = db_session.query(User).filter_by(id=1).first()
+        user = sqlite_session.query(User).filter_by(id=1).first()
         user.status = "active"
-        db_session.commit()
+        sqlite_session.commit()
 
     # Verify the precise chronological timeline of the transaction
     phase.assert_executed_queries(
