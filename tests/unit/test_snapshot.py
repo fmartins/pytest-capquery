@@ -72,6 +72,8 @@ def test_internal_catching_a_sql_regression(sqlite_engine, sqlite_session, tmp_p
         with pytest.raises(AssertionError) as exc_info:
             regression_phase.assert_matches_snapshot()
 
+    sqlite_session.rollback()
+
     error_msg = str(exc_info.value)
     assert "Mismatch at index 1" in error_msg
     assert "Expected SQL:\nSELECT 1" in error_msg
@@ -90,6 +92,8 @@ def test_internal_missing_snapshot_file(sqlite_engine, sqlite_session, tmp_path)
 
         with pytest.raises(AssertionError) as exc_info:
             phase.assert_matches_snapshot()
+
+    sqlite_session.rollback()
 
     error_msg = str(exc_info.value)
     assert "No snapshot found for this test." in error_msg
@@ -114,6 +118,8 @@ def test_internal_snapshot_file_overwritten_in_update_mode(sqlite_engine, sqlite
         with wrapper_update2.capture() as phase2:
             sqlite_session.execute(text("SELECT 'NEW'"))
         phase2.assert_matches_snapshot()
+
+    sqlite_session.rollback()
 
     content = sm_update2.snapshot_file.read_text()
     assert "SELECT 'NEW'" in content
