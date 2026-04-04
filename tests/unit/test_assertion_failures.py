@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import text
+
 from pytest_capquery.plugin import TxEvent, NormalizedStringStmt
 
 
@@ -150,3 +151,23 @@ def test_assertion_error_copy_paste_block_no_params(capquery, capsys):
     # Verify the long query formatting branch (multiline without parameter tuple) was hit
     assert "    # language=SQL\n" in stdout
     assert "FROM some_very_long_table_name" in stdout
+
+
+def test_assertion_error_copy_paste_block_empty_query(capquery, capsys):
+    """
+    Ensures 100% coverage by hitting the `if not q_str: continue` branch
+    inside the `copy_paste_block` generator.
+    """
+    # Inject a completely empty statement
+    empty_stmt = NormalizedStringStmt(statement="", parameters=None)
+    capquery.statements.append(empty_stmt)
+
+    # Force an assertion failure to trigger the copy-paste block generation
+    with pytest.raises(AssertionError):
+        capquery.assert_executed_queries("EXPECTED_SOMETHING_ELSE")
+
+    stdout = capsys.readouterr().out
+
+    # The empty string should be safely skipped via the `continue` branch,
+    # meaning the generated block should just be empty parentheses.
+    assert "assert_executed_queries(\n\n)" in stdout
