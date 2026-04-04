@@ -38,8 +38,12 @@ clean: ## Remove virtual environment and cached files
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/
 
-format: ## Run Prettier to format markdown, yaml, and json files
+format: ## Run formatters for python, markdown, yaml, and json files
+	./.venv/bin/docformatter --in-place --wrap-summaries 100 --wrap-descriptions 100 -r src tests || test $$? -eq 3
+	./.venv/bin/ruff format src tests
 	npx prettier --write .
 
-check-format: ## Check if files comply with Prettier formatting (for CI)
+check-format: ## Check if files comply with formatting rules (for CI)
+	./.venv/bin/docformatter --check --wrap-summaries 100 --wrap-descriptions 100 -r src tests
+	./.venv/bin/ruff format --check src tests
 	npx prettier --check .

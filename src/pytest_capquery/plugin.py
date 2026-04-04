@@ -1,5 +1,4 @@
-"""
-Pytest Capquery Plugin.
+"""Pytest Capquery Plugin.
 
 License: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 Author: Felipe Cardoso Martins <felipe.cardoso.martins@gmail.com>
@@ -23,16 +22,16 @@ from pytest_capquery.snapshot import SnapshotManager
 
 
 class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
+    """The principal orchestration block bridging standard intercept hooks tightly onto internal
+    verification ledgers.
+
+    Translates database connection signals actively and provisions isolated context managers.
     """
-    The principal orchestration block bridging standard intercept hooks tightly onto
-    internal verification ledgers. Translates database connection signals actively
-    and provisions isolated context managers.
-    """
+
     _listeners: Dict[str, Callable[[Connection], None]]
 
     def __init__(self, engine: Engine, snapshot_manager: Optional[SnapshotManager] = None) -> None:
-        """
-        Instantiates wrapper payload collections against the provided SQLAlchemy Engine.
+        """Instantiates wrapper payload collections against the provided SQLAlchemy Engine.
 
         Args:
             engine (Engine): The target SQLAlchemy execution engine to monitor.
@@ -46,8 +45,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         self.phases: List[Dict[str, object]] = []
 
     def __enter__(self) -> "CapQueryWrapper":
-        """
-        Registers core lifecycle event traps establishing tracking footprints seamlessly.
+        """Registers core lifecycle event traps establishing tracking footprints seamlessly.
 
         Returns:
             CapQueryWrapper: The globally referenced contextual interceptor instance.
@@ -63,8 +61,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        """
-        Cleans dynamically wired framework event traps ensuring pristine un-contaminated exits.
+        """Cleans dynamically wired framework event traps ensuring pristine un-contaminated exits.
 
         Args:
             exc_type (object): The class of the propagated exception, if any.
@@ -89,10 +86,14 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             except Exception:
                 pass
 
-    def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> CaptureContext:
-        """
-        Generates and scopes a distinctly detached logic block delegating boundary mapping
-        while pushing results toward the standard sequential ledger seamlessly.
+    def capture(
+        self,
+        expected_count: Optional[int] = None,
+        assert_snapshot: bool = False,
+        alias: Optional[str] = None,
+    ) -> CaptureContext:
+        """Generates and scopes a distinctly detached logic block delegating boundary mapping while
+        pushing results toward the standard sequential ledger seamlessly.
 
         Args:
             expected_count (Optional[int]): The precise absolute metric of events expected executed.
@@ -105,8 +106,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         return CaptureContext(self, expected_count, assert_snapshot, alias)
 
     def _serialize_snapshot(self) -> str:
-        """
-        Translates raw parameter maps and SQL blocks logically into explicitly formed disk
+        """Translates raw parameter maps and SQL blocks logically into explicitly formed disk
         persistence definitions.
 
         Returns:
@@ -134,8 +134,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
         return "\n".join(lines).strip() + "\n"
 
     def _deserialize_snapshot(self, content: str) -> List[List[Union[str, Tuple[str, object]]]]:
-        """
-        Navigates disk strings reversing parameter definitions directly up toward standard
+        """Navigates disk strings reversing parameter definitions directly up toward standard
         internal comparative models properly handling sequence parsing cleanly.
 
         Args:
@@ -181,8 +180,7 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """
-    Extends the native testing client bridging explicitly required execution arguments.
+    """Extends the native testing client bridging explicitly required execution arguments.
 
     Args:
         parser (pytest.Parser): The global parameter registry injected by pytest upon load.
@@ -195,14 +193,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--capquery-update",
         action="store_true",
         default=False,
-        help="Update capquery .sql snapshot files instead of failing tests."
+        help="Update capquery .sql snapshot files instead of failing tests.",
     )
 
 
 @pytest.fixture
 def capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> CapQueryWrapper:
-    """
-    High-level standard testing interface securely delivering functional interception wrappers.
+    """High-level standard testing interface securely delivering functional interception wrappers.
     This fixture is specifically configured natively defaulting to standard SQLite validation.
 
     Args:
@@ -214,9 +211,7 @@ def capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> CapQueryW
     """
     update_mode = request.config.getoption("--capquery-update")
     snapshot_manager = SnapshotManager(
-        nodeid=request.node.nodeid,
-        test_path=Path(request.node.path),
-        update_mode=update_mode
+        nodeid=request.node.nodeid, test_path=Path(request.node.path), update_mode=update_mode
     )
 
     with CapQueryWrapper(sqlite_engine, snapshot_manager=snapshot_manager) as captured:

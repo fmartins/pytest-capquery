@@ -1,20 +1,18 @@
-"""
-Validation of complex dynamic SQLAlchemy internal execution mechanics.
+"""Validation of complex dynamic SQLAlchemy internal execution mechanics.
 
-This module rigorously proves mapping interactions between Python models and
-intercepted raw DBAPI expressions correctly match declarative structures reliably
-across complicated joined loads and multi-transaction loops securely.
+This module rigorously proves mapping interactions between Python models and intercepted raw DBAPI
+expressions correctly match declarative structures reliably across complicated joined loads and
+multi-transaction loops securely.
 """
+
 from sqlalchemy.orm import joinedload
 
 from tests.models import AlarmPanel, Sensor
 
 
 def test_orm_insert(sqlite_session, capquery):
-    """
-    Ensures that standard sequential class-based object insertions resolve distinctly
-    to correct parameter tuple bounds perfectly matching standard SQL generation paths.
-    """
+    """Ensures that standard sequential class-based object insertions resolve distinctly to correct
+    parameter tuple bounds perfectly matching standard SQL generation paths."""
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sensor1 = Sensor(name="Front Door", sensor_type="Contact")
     sensor2 = Sensor(name="Living Room", sensor_type="Motion")
@@ -32,30 +30,28 @@ def test_orm_insert(sqlite_session, capquery):
             INSERT INTO alarm_panels (mac_address, is_online)
             VALUES (?, ?)
             """,
-            ("00:11:22:33:44:55", 1)
+            ("00:11:22:33:44:55", 1),
         ),
         (
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (?, ?, ?) RETURNING id
             """,
-            (1, "Front Door", "Contact")
+            (1, "Front Door", "Contact"),
         ),
         (
             """
             INSERT INTO sensors (panel_id, name, sensor_type)
             VALUES (?, ?, ?) RETURNING id
             """,
-            (1, "Living Room", "Motion")
-        )
+            (1, "Living Room", "Motion"),
+        ),
     )
 
 
 def test_orm_update(sqlite_session, capquery):
-    """
-    Confirms targeted object parameter replacement automatically delegates strict
-    SQL update strings precisely bounded against verified schema definitions continuously.
-    """
+    """Confirms targeted object parameter replacement automatically delegates strict SQL update
+    strings precisely bounded against verified schema definitions continuously."""
     panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=False)
     sqlite_session.add(panel)
     sqlite_session.flush()
@@ -76,7 +72,7 @@ def test_orm_update(sqlite_session, capquery):
             WHERE alarm_panels.mac_address = ?
             LIMIT ? OFFSET ?
             """,
-            ("AA:BB:CC:DD:EE:FF", 1, 0)
+            ("AA:BB:CC:DD:EE:FF", 1, 0),
         ),
         (
             """
@@ -84,16 +80,14 @@ def test_orm_update(sqlite_session, capquery):
             SET is_online=?
             WHERE alarm_panels.id = ?
             """,
-            (1, 1)
-        )
+            (1, 1),
+        ),
     )
 
 
 def test_orm_delete(sqlite_session, capquery):
-    """
-    Validates cascaded removal triggers corresponding object deletion queries cleanly
-    leaving exact session markers fully transparent for regression checking layers.
-    """
+    """Validates cascaded removal triggers corresponding object deletion queries cleanly leaving
+    exact session markers fully transparent for regression checking layers."""
     panel = AlarmPanel(mac_address="11:22:33:44:55:66", is_online=True)
     sensor = Sensor(name="Back Door", sensor_type="Contact")
     panel.sensors.append(sensor)
@@ -118,30 +112,30 @@ def test_orm_delete(sqlite_session, capquery):
             WHERE sensors.name = ?
             LIMIT ? OFFSET ?
             """,
-            ("Back Door", 1, 0)
+            ("Back Door", 1, 0),
         ),
         (
             """
             DELETE FROM sensors
             WHERE sensors.id = ?
             """,
-            (1,)
-        )
+            (1,),
+        ),
     )
 
 
 def test_orm_select(sqlite_session, capquery):
-    """
-    Assures simple declarative fetching routines bypass unnecessary engine overheads,
-    directly exposing concise limiting offset targets deterministically properly.
-    """
+    """Assures simple declarative fetching routines bypass unnecessary engine overheads, directly
+    exposing concise limiting offset targets deterministically properly."""
     panel = AlarmPanel(mac_address="22:33:44:55:66:77", is_online=False)
     sqlite_session.add(panel)
     sqlite_session.flush()
 
     capquery.statements.clear()
 
-    fetched_panel = sqlite_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
+    fetched_panel = (
+        sqlite_session.query(AlarmPanel).filter_by(mac_address="22:33:44:55:66:77").first()
+    )
 
     assert fetched_panel is not None
     capquery.assert_executed_queries(
@@ -155,16 +149,14 @@ def test_orm_select(sqlite_session, capquery):
             WHERE alarm_panels.mac_address = ?
             LIMIT ? OFFSET ?
             """,
-            ("22:33:44:55:66:77", 1, 0)
+            ("22:33:44:55:66:77", 1, 0),
         )
     )
 
 
 def test_avoid_n_plus_one_queries(sqlite_session, capquery):
-    """
-    Simulates optimized bulk ingestion loading architectures, effectively asserting
-    joined-load configuration successfully prevents N+1 execution disasters logically.
-    """
+    """Simulates optimized bulk ingestion loading architectures, effectively asserting joined-load
+    configuration successfully prevents N+1 execution disasters logically."""
     for i in range(3):
         panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
         sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
@@ -200,10 +192,8 @@ def test_avoid_n_plus_one_queries(sqlite_session, capquery):
 
 
 def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
-    """
-    Establishes an intentional N+1 failure proving the execution tracer successfully
-    chronicles repeating redundant queries reliably exposing bad optimization architectures.
-    """
+    """Establishes an intentional N+1 failure proving the execution tracer successfully chronicles
+    repeating redundant queries reliably exposing bad optimization architectures."""
     for i in range(3):
         panel = AlarmPanel(mac_address=f"00:00:00:00:00:0{i}", is_online=True)
         sensors = [Sensor(name=f"Sensor {j}", sensor_type="Contact") for j in range(5)]
@@ -239,7 +229,7 @@ def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
             FROM sensors
             WHERE ? = sensors.panel_id
             """,
-            (1,)
+            (1,),
         ),
         (
             """
@@ -251,7 +241,7 @@ def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
             FROM sensors
             WHERE ? = sensors.panel_id
             """,
-            (2,)
+            (2,),
         ),
         (
             """
@@ -263,6 +253,6 @@ def test_demonstrate_n_plus_one_problem(sqlite_session, capquery):
             FROM sensors
             WHERE ? = sensors.panel_id
             """,
-            (3,)
-        )
+            (3,),
+        ),
     )

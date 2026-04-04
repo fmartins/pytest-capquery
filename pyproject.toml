@@ -21,12 +21,14 @@ capquery = "pytest_capquery.plugin"
 [project.optional-dependencies]
 test = [
     "cryptography",
+    "docformatter",
     "pre-commit",
     "psycopg2-binary",
     "pymysql",
     "pytest-cov",
     "pytest-watcher",
-    "pytest-xdist"
+    "pytest-xdist",
+    "ruff"
 ]
 
 [tool.coverage.run]
@@ -35,3 +37,10 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 100

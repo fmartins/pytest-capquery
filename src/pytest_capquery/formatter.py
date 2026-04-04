@@ -1,9 +1,8 @@
-"""
-SQL query canonicalization and parametric normalization logic.
+"""SQL query canonicalization and parametric normalization logic.
 
-This module houses utilities designed to strip syntactical variances introduced
-during string execution formatting, resulting in a stable deterministic
-base allowing precise execution timeline validation.
+This module houses utilities designed to strip syntactical variances introduced during string
+execution formatting, resulting in a stable deterministic base allowing precise execution timeline
+validation.
 """
 
 import functools
@@ -14,9 +13,8 @@ format_query = functools.partial(sqlparse.format, reindent=True, keyword_case="u
 
 
 def reformat_query(query: str) -> str:
-    """
-    Standardizes whitespace, capitalizes keywords, and explicitly re-indents raw
-    SQL execution strings rendering them consistently comparable across permutations.
+    """Standardizes whitespace, capitalizes keywords, and explicitly re-indents raw SQL execution
+    strings rendering them consistently comparable across permutations.
 
     Args:
         query (str): The raw SQL string captured during database engine execution.
@@ -41,10 +39,9 @@ def reformat_query(query: str) -> str:
 
 
 def normalize_params(params: object) -> object:
-    """
-    Recursively transforms dictionary keyword arguments or nested execution lists
-    into immutable, strictly sorted tuples rendering testing assertion logic immune
-    to accidental Python implementation detail variances.
+    """Recursively transforms dictionary keyword arguments or nested execution lists into immutable,
+    strictly sorted tuples rendering testing assertion logic immune to accidental Python
+    implementation detail variances.
 
     Args:
         params (object): The raw execution parameter structure provided by the dialect driver.

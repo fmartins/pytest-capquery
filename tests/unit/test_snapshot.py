@@ -1,10 +1,10 @@
-"""
-Validation of the Snapshot capture generation and assertion capabilities.
+"""Validation of the Snapshot capture generation and assertion capabilities.
 
-This module guarantees comprehensive testing of the physical disk verification paths,
-confirming automated query comparison handles updating sequences securely while failing
-dynamically when runtime timeline representations drift from established persistence logic.
+This module guarantees comprehensive testing of the physical disk verification paths, confirming
+automated query comparison handles updating sequences securely while failing dynamically when
+runtime timeline representations drift from established persistence logic.
 """
+
 import pytest
 from sqlalchemy import text
 
@@ -14,11 +14,9 @@ from tests.models import AlarmPanel, Sensor
 
 
 def test_user_business_logic(sqlite_session, capquery):
-    """
-    Simulates a standard practical snapshot generation sequence, verifying the
-    plugin captures local nested blocks directly resolving them appropriately against
-    implicit automated file allocations automatically tied to the host test invocation.
-    """
+    """Simulates a standard practical snapshot generation sequence, verifying the plugin captures
+    local nested blocks directly resolving them appropriately against implicit automated file
+    allocations automatically tied to the host test invocation."""
     panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
     sqlite_session.add(panel)
     sqlite_session.flush()
@@ -30,9 +28,9 @@ def test_user_business_logic(sqlite_session, capquery):
 
 
 def test_user_multiple_phases(sqlite_session, capquery):
-    """
-    Confirms multiple capture phases inside single transaction tests write and check
-    their relative sequential markers distinctly within the overarching module scope.
+    """Confirms multiple capture phases inside single transaction tests write and check their
+    relative sequential markers distinctly within the overarching module scope.
+
     Ensures safe serialization of all phases into a single cohesive snapshot block.
     """
     panel = AlarmPanel(mac_address="AA:BB:CC:DD:EE:FF", is_online=True)
@@ -54,10 +52,8 @@ def test_user_multiple_phases(sqlite_session, capquery):
 
 
 def test_internal_catching_a_sql_regression(sqlite_engine, sqlite_session, tmp_path):
-    """
-    Guarantees logical code drifts trigger accurate output diff comparisons against
-    the explicit physical entries ensuring regressions are visibly surfaced quickly.
-    """
+    """Guarantees logical code drifts trigger accurate output diff comparisons against the explicit
+    physical entries ensuring regressions are visibly surfaced quickly."""
     test_file = tmp_path / "test_regression.py"
 
     sm_update = SnapshotManager(nodeid="test_regression", test_path=test_file, update_mode=True)
@@ -83,10 +79,8 @@ def test_internal_catching_a_sql_regression(sqlite_engine, sqlite_session, tmp_p
 
 
 def test_internal_missing_snapshot_file(sqlite_engine, sqlite_session, tmp_path):
-    """
-    Proves missing physical representations gracefully surface explicit developer
-    instructions guiding them toward generation commands rather than simply failing.
-    """
+    """Proves missing physical representations gracefully surface explicit developer instructions
+    guiding them toward generation commands rather than simply failing."""
     test_file = tmp_path / "test_missing.py"
 
     sm_read = SnapshotManager(nodeid="test_missing", test_path=test_file, update_mode=False)
@@ -103,10 +97,8 @@ def test_internal_missing_snapshot_file(sqlite_engine, sqlite_session, tmp_path)
 
 
 def test_internal_snapshot_file_overwritten_in_update_mode(sqlite_engine, sqlite_session, tmp_path):
-    """
-    Confirms the pipeline operating in explicit update mode completely replaces
-    stale physical markers instead of redundantly appending overlapping execution logic.
-    """
+    """Confirms the pipeline operating in explicit update mode completely replaces stale physical
+    markers instead of redundantly appending overlapping execution logic."""
     test_file = tmp_path / "test_overwrite.py"
 
     sm_update1 = SnapshotManager(nodeid="test_overwrite", test_path=test_file, update_mode=True)
