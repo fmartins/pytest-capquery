@@ -107,14 +107,14 @@ class SnapshotManager:
         self.nodeid = nodeid
         self.update_mode = update_mode
 
-        self.snapshot_dir = test_path.parent / "__snapshots__"
+        self.snapshot_dir = test_path.parent / "__capquery_snapshots__" / test_path.stem
 
         # Sanitize test name to create a safe filename (handles parameterized tests)
         safe_name = nodeid.split("::")[-1].replace("[", "_").replace("]", "").replace("/", "_")
-        self.snapshot_file = self.snapshot_dir / f"{test_path.stem}_{safe_name}.sql"
+        self.snapshot_file = self.snapshot_dir / f"{safe_name}.sql"
 
     def save(self, content: str) -> None:
-        self.snapshot_dir.mkdir(exist_ok=True)
+        self.snapshot_dir.mkdir(parents=True, exist_ok=True)
         self.snapshot_file.write_text(content, encoding="utf-8")
 
     def load(self) -> Optional[str]:
@@ -340,9 +340,10 @@ class QueryAsserter:
 
 class CaptureContext(QueryAsserter):
     """A context manager representing a localized slice of captured SQL queries."""
-    def __init__(self, wrapper: "CapQueryWrapper", expected_count: Optional[int] = None) -> None:
+    def __init__(self, wrapper: "CapQueryWrapper", expected_count: Optional[int] = None, assert_snapshot: bool = False) -> None:
         self._wrapper = wrapper
         self._expected_count = expected_count
+        self._assert_snapshot = assert_snapshot
         self.snapshot_manager = wrapper.snapshot_manager
         self._start_idx = 0
         self._end_idx = 0
@@ -358,6 +359,8 @@ class CaptureContext(QueryAsserter):
         self._active = False
         if exc_type is None and self._expected_count is not None:
             self.assert_total_queries(self._expected_count)
+        if exc_type is None and self._assert_snapshot:
+            self.assert_matches_snapshot()
 
     @property
     def statements(self) -> List[Any]:
@@ -390,8 +393,8 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             event.remove(self.engine, name, fn)
         super().__exit__(exc_type, exc_val, exc_tb)
 
-    def capture(self, expected_count: Optional[int] = None) -> CaptureContext:
-        return CaptureContext(self, expected_count)
+    def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False) -> CaptureContext:
+        return CaptureContext(self, expected_count, assert_snapshot)
 
 
 # ==============================================================================
