@@ -1,5 +1,6 @@
 import pytest
 
+pytest.register_assert_rewrite("pytest_capquery.plugin")
 pytest_plugins = ["pytest_capquery.plugin"]
 
 from sqlalchemy import create_engine
