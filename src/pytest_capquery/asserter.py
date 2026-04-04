@@ -7,7 +7,7 @@ helpers assisting users rectifying timeline failures.
 """
 import sys
 import textwrap
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple, Union, cast
 
 from pytest_capquery.formatter import normalize_params, reformat_query
 from pytest_capquery.models import CapturedStmt
@@ -21,9 +21,15 @@ class QueryAsserter:
     """
     snapshot_manager: Optional[SnapshotManager] = None
 
-    def _normalize_statement(self, item: Any) -> CapturedStmt:
+    def _normalize_statement(self, item: object) -> CapturedStmt:
         """
         Enforces execution payloads map natively mapping standard tracking protocols.
+
+        Args:
+            item (object): The raw intercepted item from the execution sequence.
+
+        Returns:
+            CapturedStmt: The type-safe payload explicitly matching our protocol rules.
         """
         return cast(CapturedStmt, item)
 
@@ -32,6 +38,9 @@ class QueryAsserter:
         """
         Algorithmically generates perfectly synthesized fully executable assertion blocks
         matching exactly the actually intercepted runtime sequence to vastly accelerate developer velocity.
+
+        Returns:
+            str: The auto-generated syntactically correct assertion code block.
         """
         lines = []
         for raw_stmt in self.statements:
@@ -70,6 +79,9 @@ class QueryAsserter:
     def queries_history(self) -> str:
         """
         Formats dynamically collected queries structurally delivering detailed runtime traces for terminal output formatting.
+
+        Returns:
+            str: Structured debug timeline rendering SQL executions efficiently.
         """
         out = []
         for raw_stmt in self.statements:
@@ -84,12 +96,21 @@ class QueryAsserter:
     def help(self) -> str:
         """
         Provides direct troubleshooting context delivering raw sequence markers.
+
+        Returns:
+            str: The helpful debugging preamble injected before assertion fail stacks.
         """
         return f"Captured queries:\n{self.queries_history}"
 
     def _fail_with_instructions(self, error_msg: str) -> None:
         """
         Breaks standard test execution flow decisively rendering developer acceleration syntax trees correctly into sys.stdout natively preventing framework hiding.
+
+        Args:
+            error_msg (str): The localized specific error reason determining the test failure.
+
+        Raises:
+            AssertionError: A dynamically formulated terminal exception rendering fixing layouts properly.
         """
         divider = "=" * 80
         out = (
@@ -103,9 +124,16 @@ class QueryAsserter:
         sys.stdout.flush()
         raise AssertionError(f"{error_msg}\n\n(See 'Captured stdout call' above for the copy-paste block)")
 
-    def assert_executed_queries(self, *expected_queries: Union[str, Tuple[str, Any]], strict: bool = True) -> None:
+    def assert_executed_queries(self, *expected_queries: Union[str, Tuple[str, object]], strict: bool = True) -> None:
         """
         Primary execution surface navigating provided argument targets meticulously comparing them comprehensively against the intercept state.
+
+        Args:
+            *expected_queries (Union[str, Tuple[str, object]]): Variable length structural expectations array.
+            strict (bool): Determines if sequence bounds must absolutely assert against tracked depths natively.
+
+        Raises:
+            AssertionError: When chronometric deviations or parameter mismatches detect failures transparently.
         """
         if strict:
             self.assert_total_queries(len(expected_queries))
@@ -160,6 +188,12 @@ class QueryAsserter:
     def assert_total_queries(self, expected_total_queries: int) -> None:
         """
         Guarantees strict chronometric lengths matching runtime assertions perfectly preventing unverified subsequent code blocks silently executing.
+
+        Args:
+            expected_total_queries (int): The specific expected total size of intercepted loops.
+
+        Raises:
+            AssertionError: Dynamically if length assertions miss bounds correctly triggering fail safe sequences neutrally.
         """
         if len(self.statements) != expected_total_queries:
             self._fail_with_instructions(
@@ -171,9 +205,18 @@ class CaptureContext(QueryAsserter):
     """
     A specific localized evaluation engine binding transient query markers directly returning controlled bounds isolation capabilities dynamically handling nesting natively.
     """
-    def __init__(self, wrapper: Any, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> None:
+    def __init__(self, wrapper: object, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> None:
         """
         Stores evaluation scopes tightly tracking absolute underlying pointers bridging execution spaces securely safely.
+
+        Args:
+            wrapper (object): The parent controller housing actual execution arrays contextually.
+            expected_count (Optional[int]): Total SQL operations anticipated during isolation.
+            assert_snapshot (bool): Activates persistent disk comparison matrices correctly overriding normal assert targets softly.
+            alias (Optional[str]): Segment label categorizing snapshot phases distinctly natively preventing naming collisions transparently.
+
+        Returns:
+            None
         """
         self._wrapper = wrapper
         self._expected_count = expected_count
@@ -188,14 +231,28 @@ class CaptureContext(QueryAsserter):
     def __enter__(self) -> "CaptureContext":
         """
         Registers active cursor offsets seamlessly.
+
+        Returns:
+            CaptureContext: The active tracked bounding context.
         """
         self._start_idx = len(self._wrapper.statements)
         self._active = True
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         """
         Releases cursor trackers gracefully optionally dispatching native assertion comparisons or persistence file resolutions correctly safely terminating.
+
+        Args:
+            exc_type (object): The class of the propagated exception, if any.
+            exc_val (object): The concrete instance of the exception, if any.
+            exc_tb (object): The absolute stack trace of the error, if any.
+
+        Raises:
+            AssertionError: When contextual validations fail implicitly safely capturing metrics gracefully.
+
+        Returns:
+            None
         """
         self._end_idx = len(self._wrapper.statements)
         self._active = False
@@ -212,9 +269,12 @@ class CaptureContext(QueryAsserter):
             self.assert_matches_snapshot()
 
     @property
-    def statements(self) -> List[Any]:
+    def statements(self) -> List[object]:
         """
         Discovers exactly targeted transient transaction arrays automatically computing accurate pointer windows independently from global spaces tightly flexibly.
+
+        Returns:
+            List[object]: Bounded chronological sequence blocks localized to this exact capture block smartly securely.
         """
         if self._active:
             return self._wrapper.statements[self._start_idx:]
@@ -223,6 +283,13 @@ class CaptureContext(QueryAsserter):
     def assert_matches_snapshot(self) -> None:
         """
         Triggers underlying physical verification channels pulling serialization matrices and testing accurately strictly resolving missing paths transparently correctly safely.
+
+        Raises:
+            RuntimeError: If snapshots are tested without configuring corresponding managers.
+            AssertionError: When actual operations diverge from pre-saved baseline files.
+
+        Returns:
+            None
         """
         if not self.snapshot_manager:
             raise RuntimeError("SnapshotManager is not configured. Ensure capquery fixture is used correctly.")

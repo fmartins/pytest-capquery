@@ -18,6 +18,8 @@ def test_insert_and_select_snapshot(mysql_session, mysql_capquery):
     Validate that MySQL inserts and complex select operations emit the expected
     events which are accurately captured and automatically evaluated against the
     disk file by the snapshot assertion system.
+
+    Snapshot Asset: `__capquery_snapshots__/test_snapshot/test_insert_and_select_snapshot.sql`
     """
     with mysql_capquery.capture(assert_snapshot=True):
         panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
@@ -29,4 +31,3 @@ def test_insert_and_select_snapshot(mysql_session, mysql_capquery):
 
         queried_panel = mysql_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).filter_by(mac_address="00:11:22:33:44:55").first()
         assert queried_panel is not None
-pytestmark = pytest.mark.xdist_group('e2e')

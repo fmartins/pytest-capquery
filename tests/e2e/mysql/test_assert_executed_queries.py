@@ -69,4 +69,3 @@ def test_insert_and_select_normalization(mysql_session, mysql_capquery):
         ),
         strict=False
     )
-pytestmark = pytest.mark.xdist_group('e2e')

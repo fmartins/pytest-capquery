@@ -71,4 +71,3 @@ def test_insert_and_select_normalization(postgres_session, postgres_capquery):
         ),
         strict=False
     )
-pytestmark = pytest.mark.xdist_group('e2e')

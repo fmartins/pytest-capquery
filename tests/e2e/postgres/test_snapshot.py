@@ -18,6 +18,8 @@ def test_insert_and_select_snapshot(postgres_session, postgres_capquery):
     Validate that PostgreSQL returning inserts and complex select operations emit
     events which are accurately captured and automatically evaluated against the
     disk file by the snapshot assertion system.
+
+    Snapshot Asset: `__capquery_snapshots__/test_snapshot/test_insert_and_select_snapshot.sql`
     """
     with postgres_capquery.capture(assert_snapshot=True):
         panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)
@@ -29,4 +31,3 @@ def test_insert_and_select_snapshot(postgres_session, postgres_capquery):
 
         queried_panel = postgres_session.query(AlarmPanel).options(joinedload(AlarmPanel.sensors)).filter_by(mac_address="00:11:22:33:44:55").first()
         assert queried_panel is not None
-pytestmark = pytest.mark.xdist_group('e2e')

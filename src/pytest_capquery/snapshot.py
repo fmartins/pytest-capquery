@@ -18,6 +18,14 @@ class SnapshotManager:
     def __init__(self, nodeid: str, test_path: Path, update_mode: bool) -> None:
         """
         Initializes the snapshot directory resolution against the host test.
+
+        Args:
+            nodeid (str): The unique pytest node identifier for the current test case.
+            test_path (Path): The explicit file path to the current test module.
+            update_mode (bool): Whether the system is currently instructed to overwrite snapshots.
+
+        Returns:
+            None
         """
         self.nodeid = nodeid
         self.update_mode = update_mode
@@ -30,6 +38,12 @@ class SnapshotManager:
     def save(self, content: str) -> None:
         """
         Ensures target directories exist and flushes string execution content reliably to disk.
+
+        Args:
+            content (str): The serialized snapshot payload string mapping assertion data.
+
+        Returns:
+            None
         """
         self.snapshot_dir.mkdir(parents=True, exist_ok=True)
         self.snapshot_file.write_text(content, encoding="utf-8")
@@ -38,6 +52,9 @@ class SnapshotManager:
         """
         Retrieves established baseline markers, returning None seamlessly if expectations
         have not yet been initialized.
+
+        Returns:
+            Optional[str]: The raw payload retrieved directly from the disk file, or None if missing.
         """
         if not self.snapshot_file.exists():
             return None

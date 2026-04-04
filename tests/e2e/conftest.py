@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
-from sqlalchemy import create_engine, Engine
+from sqlalchemy import create_engine, Engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from pytest_capquery.plugin import CapQueryWrapper
@@ -64,7 +64,6 @@ def postgres_session(postgres_engine: Engine) -> Generator[Session, None, None]:
     """
     SessionMaker = sessionmaker(bind=postgres_engine)
     session = SessionMaker()
-    from sqlalchemy import text
     session.execute(text("TRUNCATE TABLE alarm_panels, sensors RESTART IDENTITY CASCADE"))
     session.commit()
 
@@ -85,7 +84,6 @@ def mysql_session(mysql_engine: Engine) -> Generator[Session, None, None]:
     """
     SessionMaker = sessionmaker(bind=mysql_engine)
     session = SessionMaker()
-    from sqlalchemy import text
     session.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
     session.execute(text("TRUNCATE TABLE alarm_panels;"))
     session.execute(text("TRUNCATE TABLE sensors;"))

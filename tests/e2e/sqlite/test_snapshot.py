@@ -16,6 +16,8 @@ def test_insert_and_select_snapshot(sqlite_session, sqlite_capquery):
     Validate that SQLite insert and complex select operations emit the correct
     chronological events which are accurately captured and automatically evaluated
     against the disk file by the snapshot assertion system.
+
+    Snapshot Asset: `__capquery_snapshots__/test_snapshot/test_insert_and_select_snapshot.sql`
     """
     with sqlite_capquery.capture(assert_snapshot=True):
         panel = AlarmPanel(mac_address="00:11:22:33:44:55", is_online=True)

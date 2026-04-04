@@ -6,7 +6,9 @@ required to accurately represent database transactional events intercepted
 during SQLAlchemy execution tracking.
 """
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Protocol, Sequence, Union, runtime_checkable
+from typing import Dict, Optional, Protocol, Sequence, Union, runtime_checkable
+
+SqlParams = Optional[Union[Sequence[object], Dict[str, object]]]
 
 
 @runtime_checkable
@@ -18,13 +20,19 @@ class CapturedStmt(Protocol):
     def statement(self) -> str:
         """
         The raw string representation of the executed query or logical event.
+
+        Returns:
+            str: The literal strings or events triggered at the connection level.
         """
         ...
 
     @property
-    def parameters(self) -> Any:
+    def parameters(self) -> SqlParams:
         """
         The dynamically bound parametric payload associated with the database execution.
+
+        Returns:
+            SqlParams: The parameterized arguments passed synchronously to the database driver.
         """
         ...
 
@@ -36,7 +44,7 @@ class TxEvent:
     or query execution intercepted internally.
     """
     statement: str
-    parameters: Optional[Union[Sequence[Any], Dict[str, Any]]] = None
+    parameters: SqlParams = None
     idx: int = field(init=False)
     duration: float = 0.0
     first_table: str = "N/A"
@@ -45,11 +53,20 @@ class TxEvent:
     def __post_init__(self) -> None:
         """
         Lifecycle hook resolving specific unique instance boundaries mapping.
+
+        Returns:
+            None
         """
         self.idx = id(self)
 
-    def set_tst_next(self, now: Any) -> None:
+    def set_tst_next(self, now: float) -> None:
         """
         Extension hook intended for timing capture integration logic resolving.
+
+        Args:
+            now (float): Unix epoch float timestamp matching standard completion metrics.
+
+        Returns:
+            None
         """
         pass
