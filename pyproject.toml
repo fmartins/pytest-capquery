@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-capquery"
-version = "0.2.0"
+version = "0.3.0"
 description = "A pytest fixture for high-precision SQL testing in SQLAlchemy."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -20,15 +20,21 @@ capquery = "pytest_capquery.plugin"
 
 [project.optional-dependencies]
 test = [
-    "pytest",
-    "pytest-cov",
-    "pytest-xdist",
-    "sqlalchemy-capture-sql",
-    "sqlparse",
+    "cryptography",
+    "docformatter",
+    "pre-commit",
     "psycopg2-binary",
     "pymysql",
-    "cryptography",
-    "pre-commit"
+    "pytest-cov",
+    "pytest-watcher",
+    "pytest-xdist",
+    "ruff"
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Silence Python 3.13 GC warnings when cleaning up SQLAlchemy SQLite memory connections
+    "ignore:unclosed database in <sqlite3.Connection:ResourceWarning",
 ]
 
 [tool.coverage.run]
@@ -37,3 +43,10 @@ omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 100

@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: setup setup-env install test db-up db-down clean format check-format help
+.PHONY: setup setup-env install test tdd db-up db-down clean format check-format help
 
 help: ## Show this help message
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1,$$2 }' $(MAKEFILE_LIST)
 
 setup: setup-env install ## Full local setup: install pyenv python, create venv, and install deps
 
@@ -29,13 +29,21 @@ test: db-up ## Run all tests with code coverage and test analytics
 	./.venv/bin/pytest -p no:capquery -n auto -vvv --cov=pytest_capquery --cov-report=term-missing --cov-report=xml --junitxml=junit.xml -o junit_family=legacy tests/ || (make db-down && exit 1)
 	make db-down
 
+tdd: db-up ## Run tests in watch mode for test-driven development
+	./.venv/bin/ptw . --now --runner ./.venv/bin/pytest tests/ -vvv -p no:capquery --capquery-update || (make db-down && exit 1)
+	make db-down
+
 clean: ## Remove virtual environment and cached files
 	rm -rf .venv
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/
 
-format: ## Run Prettier to format markdown, yaml, and json files
+format: ## Run formatters for python, markdown, yaml, and json files
+	./.venv/bin/docformatter --in-place --wrap-summaries 100 --wrap-descriptions 100 -r src tests || test $$? -eq 3
+	./.venv/bin/ruff format src tests
 	npx prettier --write .
 
-check-format: ## Check if files comply with Prettier formatting (for CI)
+check-format: ## Check if files comply with formatting rules (for CI)
+	./.venv/bin/docformatter --check --wrap-summaries 100 --wrap-descriptions 100 -r src tests
+	./.venv/bin/ruff format --check src tests
 	npx prettier --check .
