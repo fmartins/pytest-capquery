@@ -104,6 +104,21 @@ class NormalizedStringStmt:
     """
     statement: str
     parameters: Any = None
+    duration: float = 0.0
+    first_table: str = "N/A"
+    sql_type: str = "STATEMENT"
+    idx: int = 0
+
+    def __post_init__(self) -> None:
+        # Give it a unique ID to satisfy the base class's SQLite insertion
+        self.idx = id(self)
+
+    def set_tst_next(self, now: Any) -> None:
+        """
+        Hook used by sqlalchemy-capture-sql for tracking timestamps
+        between subsequent events.
+        """
+        pass
 
 
 class TxEvent:
