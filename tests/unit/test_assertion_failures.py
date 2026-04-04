@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import text
 
-from pytest_capquery.plugin import TxEvent, NormalizedStringStmt
+from pytest_capquery.plugin import TxEvent
 
 
 def test_assertion_error_count_mismatch(capquery, sqlite_engine):
@@ -132,23 +132,18 @@ def test_assertion_error_copy_paste_block_no_params(capquery, capsys):
     injecting statements with `parameters=None` to hit the short-string
     and multiline-string formatting branches.
     """
-    # 1. Short event (< 30 chars, no newline, parameters=None)
     capquery.statements.append(TxEvent("BEGIN"))
 
-    # 2. Long query (forces multiline format, parameters=None)
     long_sql = "SELECT column_a, column_b, column_c FROM some_very_long_table_name"
-    capquery.statements.append(NormalizedStringStmt(statement=long_sql, parameters=None))
+    capquery.statements.append(TxEvent(statement=long_sql, parameters=None))
 
-    # 3. Force an assertion failure to render the block
     with pytest.raises(AssertionError):
         capquery.assert_executed_queries("EXPECTED_SOMETHING_ELSE")
 
     stdout = capsys.readouterr().out
 
-    # Verify the short event formatting branch was hit
     assert '    "BEGIN"' in stdout
 
-    # Verify the long query formatting branch (multiline without parameter tuple) was hit
     assert "    # language=SQL\n" in stdout
     assert "FROM some_very_long_table_name" in stdout
 
@@ -158,16 +153,12 @@ def test_assertion_error_copy_paste_block_empty_query(capquery, capsys):
     Ensures 100% coverage by hitting the `if not q_str: continue` branch
     inside the `copy_paste_block` generator.
     """
-    # Inject a completely empty statement
-    empty_stmt = NormalizedStringStmt(statement="", parameters=None)
+    empty_stmt = TxEvent(statement="", parameters=None)
     capquery.statements.append(empty_stmt)
 
-    # Force an assertion failure to trigger the copy-paste block generation
     with pytest.raises(AssertionError):
         capquery.assert_executed_queries("EXPECTED_SOMETHING_ELSE")
 
     stdout = capsys.readouterr().out
 
-    # The empty string should be safely skipped via the `continue` branch,
-    # meaning the generated block should just be empty parentheses.
     assert "assert_executed_queries(\n\n)" in stdout

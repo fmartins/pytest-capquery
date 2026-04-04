@@ -1,4 +1,3 @@
-
 """
 Pytest Capquery Plugin.
 
@@ -9,12 +8,11 @@ This module provides the core functionality for capturing and asserting upon
 SQL statements executed via SQLAlchemy within pytest test cases.
 """
 
-
 import ast
 import functools
 import sys
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence, Tuple, Union, Optional, Dict, Callable, List, cast, Protocol, runtime_checkable
 
@@ -22,7 +20,6 @@ import pytest
 import sqlparse
 from sqlalchemy import event, Connection, Engine
 from sqlalchemy_capture_sql import CaptureSqlStatements
-
 
 format_query = functools.partial(sqlparse.format, reindent=True, keyword_case="upper")
 
@@ -59,29 +56,16 @@ class CapturedStmt(Protocol):
 
 
 @dataclass
-class NormalizedStringStmt:
+class TxEvent:
     statement: str
-    parameters: Any = None
+    parameters: Optional[Union[Sequence[Any], Dict[str, Any]]] = None
+    idx: int = field(init=False)
     duration: float = 0.0
     first_table: str = "N/A"
-    sql_type: str = "STATEMENT"
-    idx: int = 0
+    sql_type: str = "EVENT"
 
     def __post_init__(self) -> None:
         self.idx = id(self)
-
-    def set_tst_next(self, now: Any) -> None:
-        pass
-
-
-class TxEvent:
-    def __init__(self, stmt: str) -> None:
-        self.statement: str = stmt
-        self.parameters: Optional[Union[Sequence[Any], Dict[str, Any]]] = None
-        self.idx: int = id(self)
-        self.duration: float = 0.0
-        self.first_table: str = "N/A"
-        self.sql_type: str = "EVENT"
 
     def set_tst_next(self, now: Any) -> None:
         pass
