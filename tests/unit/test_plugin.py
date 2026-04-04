@@ -4,8 +4,13 @@ Validation of the primary Pytest CapQuery plugin interface mechanisms.
 This module guarantees that the context encapsulation layer works reliably to isolate
 tracked database events securely without leaking transactional scope parameters globally.
 """
+from unittest.mock import MagicMock
+
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+
+from pytest_capquery.models import TxEvent
+from pytest_capquery.plugin import CapQueryWrapper
 
 
 def test_capture_block_isolation(sqlite_engine, capquery):
@@ -117,3 +122,54 @@ def test_capture_active_state_assertions(sqlite_engine, capquery):
             conn.execute(text("SELECT 2"))
 
             active_phase.assert_executed_queries("SELECT 1", "SELECT 2")
+
+
+def test_wrapper_exit_closes_resources():
+    engine = create_engine("sqlite:///:memory:")
+    wrapper = CapQueryWrapper(engine)
+    wrapper.__enter__()
+    mock_cur = MagicMock()
+    mock_conn = MagicMock()
+    wrapper._cur = mock_cur
+    wrapper.connection = mock_conn
+
+    wrapper.__exit__(None, None, None)
+
+    mock_cur.close.assert_called_once()
+    mock_conn.close.assert_called_once()
+
+    wrapper2 = CapQueryWrapper(engine)
+    wrapper2.__enter__()
+    mock_cur_exception = MagicMock()
+    mock_cur_exception.close.side_effect = Exception()
+    mock_conn_exception = MagicMock()
+    mock_conn_exception.close.side_effect = Exception()
+
+    wrapper2._cur = mock_cur_exception
+    wrapper2.connection = mock_conn_exception
+    wrapper2.__exit__(None, None, None)
+
+
+def test_serialize_snapshot_ignores_empty_query():
+    engine = create_engine("sqlite:///:memory:")
+    wrapper = CapQueryWrapper(engine)
+    wrapper.statements.append(TxEvent(statement=""))
+    wrapper.phases.append({"alias": None, "statements": wrapper.statements})
+
+    result = wrapper._serialize_snapshot()
+
+    assert result == "\n"
+
+
+def test_deserialize_snapshot_ignores_empty_query():
+    engine = create_engine("sqlite:///:memory:")
+    wrapper = CapQueryWrapper(engine)
+    content = (
+        "-- CAPQUERY: Query 1\n"
+        "-- EXPECTED_PARAMS: None\n"
+        "-- PHASE: 1\n"
+    )
+
+    result = wrapper._deserialize_snapshot(content)
+
+    assert result == []

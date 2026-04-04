@@ -6,9 +6,11 @@ trap mismatches across statement quantities, executed query formatting, paramete
 and complex nested transactional savepoints cleanly utilizing the SQLite driver.
 """
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 from pytest_capquery.models import TxEvent
+from pytest_capquery.plugin import CapQueryWrapper
+from pytest_capquery.snapshot import SnapshotManager
 
 
 def test_single_query(capquery, sqlite_engine):
@@ -345,3 +347,36 @@ def test_assertion_error_copy_paste_block_empty_query(capquery, capsys):
     stdout = capsys.readouterr().out
 
     assert "assert_executed_queries(\n\n)" in stdout
+
+
+def test_assert_matches_snapshot_without_manager():
+    engine = create_engine("sqlite:///:memory:")
+    wrapper = CapQueryWrapper(engine)
+    context = wrapper.capture()
+    with pytest.raises(RuntimeError, match="SnapshotManager is not configured. Ensure capquery fixture is used correctly."):
+        context.assert_matches_snapshot()
+
+
+def test_assert_matches_snapshot_exceeds_phases(tmp_path):
+    engine = create_engine("sqlite:///:memory:")
+    snapshot_manager = SnapshotManager(
+        nodeid="test",
+        test_path=tmp_path / "test.py",
+        update_mode=False
+    )
+    snapshot_manager.snapshot_file.parent.mkdir(parents=True, exist_ok=True)
+    snapshot_manager.snapshot_file.write_text(
+        "-- CAPQUERY: Query 1\n"
+        "-- EXPECTED_PARAMS: None\n"
+        "-- PHASE: 1\n"
+        "SELECT 1\n"
+    )
+
+    wrapper = CapQueryWrapper(engine, snapshot_manager=snapshot_manager)
+
+    with wrapper.capture(assert_snapshot=True):
+        wrapper.statements.append(TxEvent(statement="SELECT 1"))
+
+    with pytest.raises(AssertionError, match="Snapshot missing phase 2"):
+        with wrapper.capture(assert_snapshot=True):
+            pass
