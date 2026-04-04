@@ -1,3 +1,4 @@
+
 """
 Pytest Capquery Plugin.
 
@@ -22,14 +23,10 @@ from sqlalchemy import event, Connection, Engine
 from sqlalchemy_capture_sql import CaptureSqlStatements
 
 
-# ==============================================================================
-# 1. FORMATTING & NORMALIZATION
-# ==============================================================================
-
 format_query = functools.partial(sqlparse.format, reindent=True, keyword_case="upper")
 
+
 def reformat_query(query: str) -> str:
-    """Reformats a SQL query string for standardized comparison and readability."""
     query = query.strip()
     parsed = sqlparse.parse(query)
 
@@ -44,7 +41,6 @@ def reformat_query(query: str) -> str:
 
 
 def _normalize_params(params: Any) -> Any:
-    """Recursively normalizes parameter structures to ensure cross-dialect equality."""
     if isinstance(params, dict):
         return tuple(sorted((k, _normalize_params(v)) for k, v in params.items()))
     elif isinstance(params, (list, tuple)):
@@ -52,13 +48,8 @@ def _normalize_params(params: Any) -> Any:
     return params
 
 
-# ==============================================================================
-# 2. MODELS & PROTOCOLS
-# ==============================================================================
-
 @runtime_checkable
 class CapturedStmt(Protocol):
-    """Strict protocol defining a captured SQL statement or transaction event."""
     @property
     def statement(self) -> str: ...
 
@@ -68,7 +59,6 @@ class CapturedStmt(Protocol):
 
 @dataclass
 class NormalizedStringStmt:
-    """Internal normalized representation for raw string statements."""
     statement: str
     parameters: Any = None
     duration: float = 0.0
@@ -84,7 +74,6 @@ class NormalizedStringStmt:
 
 
 class TxEvent:
-    """Wrapper for transaction events to match the CapturedStmt protocol."""
     def __init__(self, stmt: str) -> None:
         self.statement: str = stmt
         self.parameters: Optional[Union[Sequence[Any], Dict[str, Any]]] = None
@@ -97,19 +86,13 @@ class TxEvent:
         pass
 
 
-# ==============================================================================
-# 3. SNAPSHOT MANAGEMENT
-# ==============================================================================
-
 class SnapshotManager:
-    """Handles the reading, writing, and path resolution for .sql snapshot files."""
     def __init__(self, nodeid: str, test_path: Path, update_mode: bool):
         self.nodeid = nodeid
         self.update_mode = update_mode
 
         self.snapshot_dir = test_path.parent / "__capquery_snapshots__" / test_path.stem
 
-        # Sanitize test name to create a safe filename (handles parameterized tests)
         safe_name = nodeid.split("::")[-1].replace("[", "_").replace("]", "").replace("/", "_")
         self.snapshot_file = self.snapshot_dir / f"{safe_name}.sql"
 
@@ -123,13 +106,7 @@ class SnapshotManager:
         return self.snapshot_file.read_text(encoding="utf-8")
 
 
-# ==============================================================================
-# 4. CORE ASSERTIONS & CODE GENERATION
-# ==============================================================================
-
 class QueryAsserter:
-    """Mixin providing assertion capabilities and terminal code generation."""
-
     snapshot_manager: Optional[SnapshotManager] = None
 
     def _normalize_statement(self, item: Any) -> CapturedStmt:
@@ -257,67 +234,51 @@ class QueryAsserter:
                 f"Expected {expected_total_queries} queries, but found {len(self.statements)}.\n\n{self.help}"
             )
 
-    def _serialize_snapshot(self) -> str:
-        """Serializes the current execution timeline into an annotated .sql format."""
-        lines = []
-        for i, raw_stmt in enumerate(self.statements, 1):
-            stmt = self._normalize_statement(raw_stmt)
-            q_str = reformat_query(stmt.statement)
 
-            if not q_str:
-                continue
+class CaptureContext(QueryAsserter):
+    def __init__(self, wrapper: "CapQueryWrapper", expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> None:
+        self._wrapper = wrapper
+        self._expected_count = expected_count
+        self._assert_snapshot = assert_snapshot
+        self.alias = alias
+        self.snapshot_manager = wrapper.snapshot_manager
+        self._start_idx = 0
+        self._end_idx = 0
+        self._active = False
+        self._phase_idx = 0
 
-            lines.append(f"-- CAPQUERY: Query {i}")
-            lines.append(f"-- EXPECTED_PARAMS: {repr(stmt.parameters)}")
-            lines.append(q_str)
-            lines.append("")
+    def __enter__(self) -> "CaptureContext":
+        self._start_idx = len(self._wrapper.statements)
+        self._active = True
+        return self
 
-        return "\n".join(lines).strip() + "\n"
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self._end_idx = len(self._wrapper.statements)
+        self._active = False
 
-    def _deserialize_snapshot(self, content: str) -> List[Union[str, Tuple[str, Any]]]:
-        """Parses an annotated .sql snapshot back into Python assertion arguments."""
-        expected_queries = []
-        blocks = content.split("-- CAPQUERY:")
+        self._phase_idx = len(self._wrapper.phases)
+        self._wrapper.phases.append({
+            "alias": self.alias,
+            "statements": self.statements
+        })
 
-        for block in blocks:
-            if not block.strip():
-                continue
+        if exc_type is None and self._expected_count is not None:
+            self.assert_total_queries(self._expected_count)
+        if exc_type is None and self._assert_snapshot:
+            self.assert_matches_snapshot()
 
-            lines = block.strip().split("\n")
-            params_str = "None"
-            query_lines = []
-
-            # Skip the first line (e.g., " Query 1") and process the rest
-            for line in lines[1:]:
-                if line.startswith("-- EXPECTED_PARAMS:"):
-                    params_str = line.replace("-- EXPECTED_PARAMS:", "").strip()
-                else:
-                    query_lines.append(line)
-
-            query_str = "\n".join(query_lines).strip()
-            if not query_str:
-                continue
-
-            # Safely evaluate the stringified tuple back into a native Python object
-            params = ast.literal_eval(params_str)
-
-            if params is None:
-                expected_queries.append(query_str)
-            else:
-                expected_queries.append((query_str, params))
-
-        return expected_queries
+    @property
+    def statements(self) -> List[Any]:
+        if self._active:
+            return self._wrapper.statements[self._start_idx:]
+        return self._wrapper.statements[self._start_idx:self._end_idx]
 
     def assert_matches_snapshot(self) -> None:
-        """
-        Compares the execution timeline against a saved .sql snapshot file.
-        If --capquery-update is passed to pytest, it overwrites the file instead.
-        """
         if not self.snapshot_manager:
             raise RuntimeError("SnapshotManager is not configured. Ensure capquery fixture is used correctly.")
 
         if self.snapshot_manager.update_mode:
-            content = self._serialize_snapshot()
+            content = self._wrapper._serialize_snapshot()
             self.snapshot_manager.save(content)
             return
 
@@ -330,52 +291,22 @@ class QueryAsserter:
                 f"{self.snapshot_manager.snapshot_file}"
             )
 
-        expected_queries = self._deserialize_snapshot(snapshot_content)
+        all_expected_phases = self._wrapper._deserialize_snapshot(snapshot_content)
+
+        if self._phase_idx >= len(all_expected_phases):
+            raise AssertionError(f"Snapshot missing phase {self._phase_idx + 1}")
+
+        expected_queries = all_expected_phases[self._phase_idx]
         self.assert_executed_queries(*expected_queries, strict=True)
 
 
-# ==============================================================================
-# 5. CAPTURE CONTEXTS
-# ==============================================================================
-
-class CaptureContext(QueryAsserter):
-    """A context manager representing a localized slice of captured SQL queries."""
-    def __init__(self, wrapper: "CapQueryWrapper", expected_count: Optional[int] = None, assert_snapshot: bool = False) -> None:
-        self._wrapper = wrapper
-        self._expected_count = expected_count
-        self._assert_snapshot = assert_snapshot
-        self.snapshot_manager = wrapper.snapshot_manager
-        self._start_idx = 0
-        self._end_idx = 0
-        self._active = False
-
-    def __enter__(self) -> "CaptureContext":
-        self._start_idx = len(self._wrapper.statements)
-        self._active = True
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        self._end_idx = len(self._wrapper.statements)
-        self._active = False
-        if exc_type is None and self._expected_count is not None:
-            self.assert_total_queries(self._expected_count)
-        if exc_type is None and self._assert_snapshot:
-            self.assert_matches_snapshot()
-
-    @property
-    def statements(self) -> List[Any]:
-        if self._active:
-            return self._wrapper.statements[self._start_idx:]
-        return self._wrapper.statements[self._start_idx:self._end_idx]
-
-
 class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
-    """Context manager and SQLAlchemy event listener for capturing executed queries."""
     _listeners: Dict[str, Callable[[Connection], None]]
 
     def __init__(self, engine: Engine, snapshot_manager: Optional[SnapshotManager] = None):
         super().__init__(engine)
         self.snapshot_manager = snapshot_manager
+        self.phases: List[Dict[str, Any]] = []
 
     def __enter__(self) -> "CapQueryWrapper":
         super().__enter__()
@@ -393,16 +324,69 @@ class CapQueryWrapper(CaptureSqlStatements, QueryAsserter):
             event.remove(self.engine, name, fn)
         super().__exit__(exc_type, exc_val, exc_tb)
 
-    def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False) -> CaptureContext:
-        return CaptureContext(self, expected_count, assert_snapshot)
+    def capture(self, expected_count: Optional[int] = None, assert_snapshot: bool = False, alias: Optional[str] = None) -> CaptureContext:
+        return CaptureContext(self, expected_count, assert_snapshot, alias)
 
+    def _serialize_snapshot(self) -> str:
+        lines = []
+        query_counter = 1
+        for phase_idx, phase in enumerate(self.phases, 1):
+            alias = phase["alias"]
+            alias_str = f" ({alias})" if alias else ""
 
-# ==============================================================================
-# 6. PYTEST INTEGRATION & HOOKS
-# ==============================================================================
+            for raw_stmt in phase["statements"]:
+                stmt = self._normalize_statement(raw_stmt)
+                q_str = reformat_query(stmt.statement)
+                if not q_str:
+                    continue
+
+                lines.append(f"-- CAPQUERY: Query {query_counter}")
+                lines.append(f"-- EXPECTED_PARAMS: {repr(stmt.parameters)}")
+                lines.append(f"-- PHASE: {phase_idx}{alias_str}")
+                lines.append(q_str)
+                lines.append("")
+                query_counter += 1
+
+        return "\n".join(lines).strip() + "\n"
+
+    def _deserialize_snapshot(self, content: str) -> List[List[Union[str, Tuple[str, Any]]]]:
+        phases: List[List[Union[str, Tuple[str, Any]]]] = []
+
+        blocks = content.split("-- CAPQUERY:")
+        for block in blocks:
+            if not block.strip():
+                continue
+
+            lines = block.strip().split("\n")
+            params_str = "None"
+            phase_num = 1
+            query_lines = []
+
+            for line in lines[1:]:
+                if line.startswith("-- EXPECTED_PARAMS:"):
+                    params_str = line.replace("-- EXPECTED_PARAMS:", "").strip()
+                elif line.startswith("-- PHASE:"):
+                    phase_info = line.replace("-- PHASE:", "").strip()
+                    phase_num = int(phase_info.split()[0])
+                else:
+                    query_lines.append(line)
+
+            query_str = "\n".join(query_lines).strip()
+            if not query_str:
+                continue
+
+            params = ast.literal_eval(params_str)
+            item = query_str if params is None else (query_str, params)
+
+            while len(phases) < phase_num:
+                phases.append([])
+
+            phases[phase_num - 1].append(item)
+
+        return phases
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Registers custom command-line flags for pytest-capquery."""
     group = parser.getgroup("capquery", "SQLAlchemy Query Assertions")
     group.addoption(
         "--capquery-update",
@@ -414,10 +398,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 @pytest.fixture
 def capquery(request: pytest.FixtureRequest, sqlite_engine: Engine) -> CapQueryWrapper:
-    """
-    A pytest fixture yielding an active CapQueryWrapper across `sqlite_engine`.
-    Automatically binds the SnapshotManager to handle .sql file generation.
-    """
     update_mode = request.config.getoption("--capquery-update")
     snapshot_manager = SnapshotManager(
         nodeid=request.node.nodeid,
